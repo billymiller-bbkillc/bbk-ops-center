@@ -43,8 +43,8 @@ function TaskCard({ task, onDragStart, onDelete }: TaskCardProps) {
         <p className="text-sm font-medium leading-tight">{task.title}</p>
         <div className="flex items-center gap-1 shrink-0">
           <button
-            onClick={(e) => { e.stopPropagation(); onDelete(task.id); }}
-            className="opacity-0 group-hover:opacity-100 hover:text-red-400 text-muted-foreground transition-opacity p-0.5 rounded"
+            onClick={(e) => { e.stopPropagation(); if (confirm('Delete this task?')) onDelete(task.id); }}
+            className="hover:text-red-400 text-muted-foreground/40 transition-colors p-0.5 rounded"
             title="Delete task"
           >
             <Trash2 className="w-3 h-3" />
