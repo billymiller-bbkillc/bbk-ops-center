@@ -1,25 +1,37 @@
 import { Router } from 'express';
-import { db, schema } from '../db';
-import { eq } from 'drizzle-orm';
+import { getAgents, getAgent, getAgentSessions } from '../lib/openclaw';
 
 const router = Router();
 
-router.get('/', (_req, res) => {
-  const agents = db.select().from(schema.agents).all();
-  res.json({ success: true, data: agents });
+router.get('/', async (_req, res) => {
+  try {
+    const agents = await getAgents();
+    res.json({ success: true, data: agents });
+  } catch (err) {
+    console.error('Error fetching agents:', err);
+    res.json({ success: true, data: [] });
+  }
 });
 
-router.get('/:id', (req, res) => {
-  const agent = db.select().from(schema.agents).where(eq(schema.agents.id, req.params.id)).get();
-  if (!agent) return res.status(404).json({ success: false, error: 'Agent not found' });
-  res.json({ success: true, data: agent });
+router.get('/:id', async (req, res) => {
+  try {
+    const agent = await getAgent(req.params.id);
+    if (!agent) return res.status(404).json({ success: false, error: 'Agent not found' });
+    res.json({ success: true, data: agent });
+  } catch (err) {
+    console.error('Error fetching agent:', err);
+    res.status(500).json({ success: false, error: 'Internal error' });
+  }
 });
 
 router.get('/:id/sessions', (req, res) => {
-  const sessions = db.select().from(schema.agentSessions)
-    .where(eq(schema.agentSessions.agentId, req.params.id))
-    .all();
-  res.json({ success: true, data: sessions });
+  try {
+    const sessions = getAgentSessions(req.params.id);
+    res.json({ success: true, data: sessions });
+  } catch (err) {
+    console.error('Error fetching sessions:', err);
+    res.json({ success: true, data: [] });
+  }
 });
 
 export default router;

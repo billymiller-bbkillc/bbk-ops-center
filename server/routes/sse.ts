@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
-import { db, schema } from '../db';
-import { eq } from 'drizzle-orm';
+import { getAgents } from '../lib/openclaw';
+import { getNodeHealth } from '../lib/system';
 
 const router = Router();
 
@@ -31,56 +31,19 @@ router.get('/stream', (req: Request, res: Response) => {
   });
 });
 
-// Simulate live updates - called from main server on interval
-export function simulateUpdates() {
-  const agents = db.select().from(schema.agents).all();
+// Real updates — called from main server on interval
+export async function pollAndBroadcast() {
+  try {
+    const agents = await getAgents();
+    const health = getNodeHealth(agents.length);
 
-  for (const agent of agents) {
-    if (agent.status === 'offline') continue;
-
-    // Randomly fluctuate uptime
-    const newUptime = agent.uptime + 5;
-    db.update(schema.agents)
-      .set({ uptime: newUptime, lastSeen: new Date().toISOString() })
-      .where(eq(schema.agents.id, agent.id))
-      .run();
+    broadcast('agent-update', agents);
+    broadcast('health-update', [health]);
+    broadcast('heartbeat', { timestamp: new Date().toISOString() });
+  } catch (err) {
+    console.error('SSE poll error:', err);
+    broadcast('heartbeat', { timestamp: new Date().toISOString() });
   }
-
-  // Fluctuate node health
-  const nodes = db.select().from(schema.nodeHealth).all();
-  for (const node of nodes) {
-    if (node.status === 'offline') continue;
-
-    const cpuDelta = (Math.random() - 0.5) * 8;
-    const memDelta = (Math.random() - 0.5) * 3;
-    const newCpu = Math.max(5, Math.min(99, node.cpuPercent + cpuDelta));
-    const newMem = Math.max(10, Math.min(99, node.memoryPercent + memDelta));
-    const newMemUsed = (newMem / 100) * node.memoryTotalMb;
-
-    let status: 'healthy' | 'warning' | 'critical' = 'healthy';
-    if (newCpu > 90 || newMem > 90) status = 'critical';
-    else if (newCpu > 70 || newMem > 75) status = 'warning';
-
-    db.update(schema.nodeHealth)
-      .set({
-        cpuPercent: Math.round(newCpu * 10) / 10,
-        memoryPercent: Math.round(newMem * 10) / 10,
-        memoryUsedMb: Math.round(newMemUsed),
-        status,
-        uptime: node.uptime + 5,
-        lastUpdated: new Date().toISOString(),
-      })
-      .where(eq(schema.nodeHealth.id, node.id))
-      .run();
-  }
-
-  // Broadcast updates
-  const updatedAgents = db.select().from(schema.agents).all();
-  const updatedNodes = db.select().from(schema.nodeHealth).all();
-
-  broadcast('agent-update', updatedAgents);
-  broadcast('health-update', updatedNodes);
-  broadcast('heartbeat', { timestamp: new Date().toISOString() });
 }
 
 export default router;

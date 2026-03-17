@@ -1,66 +1,93 @@
 import { Router } from 'express';
+import { getAllAgentUsage } from '../lib/openclaw';
 import { db, schema } from '../db';
-import { sql } from 'drizzle-orm';
 
 const router = Router();
 
 router.get('/summary', (req, res) => {
-  const period = (req.query.period as string) || 'month';
-  let daysBack = 30;
-  if (period === 'day') daysBack = 1;
-  else if (period === 'week') daysBack = 7;
+  try {
+    const period = (req.query.period as string) || 'month';
+    let daysBack = 30;
+    if (period === 'day') daysBack = 1;
+    else if (period === 'week') daysBack = 7;
 
-  const cutoff = new Date();
-  cutoff.setDate(cutoff.getDate() - daysBack);
-  const cutoffStr = cutoff.toISOString().split('T')[0];
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - daysBack);
+    const cutoffStr = cutoff.toISOString();
 
-  const usage = db.select().from(schema.tokenUsage).all()
-    .filter(u => u.date >= cutoffStr);
+    const allUsage = getAllAgentUsage();
 
-  const totalCost = usage.reduce((s, u) => s + u.cost, 0);
-  const totalTokensIn = usage.reduce((s, u) => s + u.tokensIn, 0);
-  const totalTokensOut = usage.reduce((s, u) => s + u.tokensOut, 0);
+    let totalCost = 0;
+    let totalTokensIn = 0;
+    let totalTokensOut = 0;
+    const byAgentMap = new Map<string, { agentId: string; agentName: string; cost: number; tokensIn: number; tokensOut: number }>();
+    const byModelMap = new Map<string, { model: string; cost: number; tokensIn: number; tokensOut: number }>();
+    const dailyMap = new Map<string, number>();
 
-  // By agent
-  const byAgentMap = new Map<string, { agentId: string; agentName: string; cost: number; tokensIn: number; tokensOut: number }>();
-  for (const u of usage) {
-    const existing = byAgentMap.get(u.agentId) || { agentId: u.agentId, agentName: u.agentName, cost: 0, tokensIn: 0, tokensOut: 0 };
-    existing.cost += u.cost;
-    existing.tokensIn += u.tokensIn;
-    existing.tokensOut += u.tokensOut;
-    byAgentMap.set(u.agentId, existing);
+    for (const agentData of allUsage) {
+      for (const u of agentData.usages) {
+        // Filter by period
+        if (u.timestamp && u.timestamp < cutoffStr) continue;
+
+        totalCost += u.cost;
+        totalTokensIn += u.tokensIn;
+        totalTokensOut += u.tokensOut;
+
+        // By agent
+        const agentEntry = byAgentMap.get(agentData.agentId) || {
+          agentId: agentData.agentId,
+          agentName: agentData.agentName,
+          cost: 0, tokensIn: 0, tokensOut: 0,
+        };
+        agentEntry.cost += u.cost;
+        agentEntry.tokensIn += u.tokensIn;
+        agentEntry.tokensOut += u.tokensOut;
+        byAgentMap.set(agentData.agentId, agentEntry);
+
+        // By model
+        const modelEntry = byModelMap.get(u.model) || { model: u.model, cost: 0, tokensIn: 0, tokensOut: 0 };
+        modelEntry.cost += u.cost;
+        modelEntry.tokensIn += u.tokensIn;
+        modelEntry.tokensOut += u.tokensOut;
+        byModelMap.set(u.model, modelEntry);
+
+        // Daily trend
+        const dateStr = u.timestamp ? u.timestamp.split('T')[0] : 'unknown';
+        if (dateStr !== 'unknown') {
+          dailyMap.set(dateStr, (dailyMap.get(dateStr) || 0) + u.cost);
+        }
+      }
+    }
+
+    const dailyTrend = Array.from(dailyMap.entries())
+      .map(([date, cost]) => ({ date, cost: Math.round(cost * 100) / 100 }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+
+    res.json({
+      success: true,
+      data: {
+        totalCost: Math.round(totalCost * 100) / 100,
+        totalTokensIn,
+        totalTokensOut,
+        byAgent: Array.from(byAgentMap.values()).map(a => ({ ...a, cost: Math.round(a.cost * 100) / 100 })),
+        byModel: Array.from(byModelMap.values()).map(m => ({ ...m, cost: Math.round(m.cost * 100) / 100 })),
+        dailyTrend,
+      },
+    });
+  } catch (err) {
+    console.error('Error computing costs:', err);
+    res.json({
+      success: true,
+      data: {
+        totalCost: 0,
+        totalTokensIn: 0,
+        totalTokensOut: 0,
+        byAgent: [],
+        byModel: [],
+        dailyTrend: [],
+      },
+    });
   }
-
-  // By model
-  const byModelMap = new Map<string, { model: string; cost: number; tokensIn: number; tokensOut: number }>();
-  for (const u of usage) {
-    const existing = byModelMap.get(u.model) || { model: u.model, cost: 0, tokensIn: 0, tokensOut: 0 };
-    existing.cost += u.cost;
-    existing.tokensIn += u.tokensIn;
-    existing.tokensOut += u.tokensOut;
-    byModelMap.set(u.model, existing);
-  }
-
-  // Daily trend
-  const dailyMap = new Map<string, number>();
-  for (const u of usage) {
-    dailyMap.set(u.date, (dailyMap.get(u.date) || 0) + u.cost);
-  }
-  const dailyTrend = Array.from(dailyMap.entries())
-    .map(([date, cost]) => ({ date, cost: Math.round(cost * 100) / 100 }))
-    .sort((a, b) => a.date.localeCompare(b.date));
-
-  res.json({
-    success: true,
-    data: {
-      totalCost: Math.round(totalCost * 100) / 100,
-      totalTokensIn,
-      totalTokensOut,
-      byAgent: Array.from(byAgentMap.values()).map(a => ({ ...a, cost: Math.round(a.cost * 100) / 100 })),
-      byModel: Array.from(byModelMap.values()).map(m => ({ ...m, cost: Math.round(m.cost * 100) / 100 })),
-      dailyTrend,
-    },
-  });
 });
 
 router.get('/alerts', (_req, res) => {

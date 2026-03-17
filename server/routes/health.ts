@@ -1,11 +1,18 @@
 import { Router } from 'express';
-import { db, schema } from '../db';
+import { getNodeHealth } from '../lib/system';
+import { getAgents } from '../lib/openclaw';
 
 const router = Router();
 
-router.get('/', (_req, res) => {
-  const nodes = db.select().from(schema.nodeHealth).all();
-  res.json({ success: true, data: nodes });
+router.get('/', async (_req, res) => {
+  try {
+    const agents = await getAgents();
+    const health = getNodeHealth(agents.length);
+    res.json({ success: true, data: [health] });
+  } catch (err) {
+    console.error('Error fetching health:', err);
+    res.json({ success: true, data: [] });
+  }
 });
 
 export default router;
