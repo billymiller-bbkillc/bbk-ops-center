@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { useApi } from '@/hooks/useApi';
 import { cn, getPriorityColor } from '@/lib/utils';
 import type { Task, TaskColumn, TaskPriority } from '@shared/types';
-import { Plus, Calendar, User, Building2, GripVertical, X } from 'lucide-react';
+import { Plus, Calendar, User, Building2, GripVertical, X, Trash2 } from 'lucide-react';
 
 const COLUMNS: { id: TaskColumn; label: string; color: string }[] = [
   { id: 'backlog', label: 'Backlog', color: 'text-muted-foreground' },
@@ -18,9 +18,10 @@ const COLUMNS: { id: TaskColumn; label: string; color: string }[] = [
 interface TaskCardProps {
   task: Task;
   onDragStart: (e: React.DragEvent, taskId: string) => void;
+  onDelete: (taskId: string) => void;
 }
 
-function TaskCard({ task, onDragStart }: TaskCardProps) {
+function TaskCard({ task, onDragStart, onDelete }: TaskCardProps) {
   const priorityColors: Record<TaskPriority, string> = {
     critical: 'border-l-status-critical',
     high: 'border-l-orange-400',
@@ -33,14 +34,23 @@ function TaskCard({ task, onDragStart }: TaskCardProps) {
       draggable
       onDragStart={(e) => onDragStart(e, task.id)}
       className={cn(
-        'bg-card border border-border rounded-md p-3 cursor-grab active:cursor-grabbing',
+        'group bg-card border border-border rounded-md p-3 cursor-grab active:cursor-grabbing',
         'hover:border-primary/30 transition-all border-l-2',
         priorityColors[task.priority]
       )}
     >
       <div className="flex items-start justify-between gap-2">
         <p className="text-sm font-medium leading-tight">{task.title}</p>
-        <GripVertical className="w-3 h-3 text-muted-foreground shrink-0 mt-0.5" />
+        <div className="flex items-center gap-1 shrink-0">
+          <button
+            onClick={(e) => { e.stopPropagation(); onDelete(task.id); }}
+            className="opacity-0 group-hover:opacity-100 hover:text-red-400 text-muted-foreground transition-opacity p-0.5 rounded"
+            title="Delete task"
+          >
+            <Trash2 className="w-3 h-3" />
+          </button>
+          <GripVertical className="w-3 h-3 text-muted-foreground mt-0.5" />
+        </div>
       </div>
 
       {task.description && (
@@ -166,6 +176,17 @@ export function KanbanBoard() {
     refetch();
   }, [refetch]);
 
+  const handleDeleteTask = useCallback(async (taskId: string) => {
+    setTasks(prev => prev?.filter(t => t.id !== taskId) || null);
+    await fetch(`/api/tasks/${taskId}`, { method: 'DELETE' });
+  }, [setTasks]);
+
+  const handleClearAllTasks = useCallback(async () => {
+    if (!tasks?.length) return;
+    setTasks([]);
+    await Promise.all(tasks.map(t => fetch(`/api/tasks/${t.id}`, { method: 'DELETE' })));
+  }, [tasks, setTasks]);
+
   // Get unique business units
   const businessUnits = [...new Set(tasks?.map(t => t.businessUnit) || [])];
 
@@ -203,6 +224,17 @@ export function KanbanBoard() {
             <option value="medium">Medium</option>
             <option value="low">Low</option>
           </select>
+          {tasks && tasks.length > 0 && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-xs text-red-400 hover:text-red-300 hover:bg-red-400/10"
+              onClick={() => { if (confirm('Delete all tasks?')) handleClearAllTasks(); }}
+            >
+              <Trash2 className="w-3 h-3 mr-1" />
+              Clear All
+            </Button>
+          )}
         </div>
       </div>
 
@@ -249,7 +281,7 @@ export function KanbanBoard() {
                   />
                 )}
                 {columnTasks.map(task => (
-                  <TaskCard key={task.id} task={task} onDragStart={handleDragStart} />
+                  <TaskCard key={task.id} task={task} onDragStart={handleDragStart} onDelete={handleDeleteTask} />
                 ))}
               </div>
             </div>
