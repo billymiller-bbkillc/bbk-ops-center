@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { getAgents } from '../lib/openclaw';
 import { getNodeHealth } from '../lib/system';
 import { getCrmHealth } from '../lib/salespipe';
+import { getGlobalStats } from '../lib/crm-db';
 import { getN8nSummary, getWorkflows, getExecutions } from '../lib/n8n';
 
 const router = Router();
@@ -44,6 +45,14 @@ export async function pollAndBroadcast() {
     const crmHealth = getCrmHealth();
     if (crmHealth) {
       broadcast('crm-update', crmHealth);
+    }
+
+    // Broadcast global CRM stats from DB
+    try {
+      const globalStats = await getGlobalStats();
+      broadcast('crm-stats-update', globalStats);
+    } catch {
+      // DB may be unavailable, don't break SSE loop
     }
 
     broadcast('n8n-update', {

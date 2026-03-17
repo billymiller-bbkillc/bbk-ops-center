@@ -100,6 +100,7 @@ export interface CrmHealth {
   lastChecked: string;
 }
 
+// Legacy single-org stats (kept for backward compat)
 export interface CrmStats {
   leads: number;
   deals: number;
@@ -113,6 +114,44 @@ export interface CrmPipeline {
   name: string;
   isDefault: boolean;
   stages: { id: string; name: string; orderIndex: number; dealCount?: number }[];
+}
+
+// Super Admin cross-tenant types
+export interface CrmGlobalStats {
+  totalOrganizations: number;
+  totalUsers: number;
+  totalLeads: number;
+  totalDeals: number;
+  totalClients: number;
+  totalCompanies: number;
+  lastChecked: string;
+}
+
+export interface CrmOrganization {
+  id: string;
+  name: string;
+  status: string;
+  planType: string;
+  subscriptionTier: string;
+  seats: number;
+  paymentStatus: string;
+  createdAt: string;
+  userCount: number;
+  leadCount: number;
+  dealCount: number;
+  clientCount: number;
+}
+
+export interface CrmActivity {
+  type: 'lead' | 'deal' | 'client';
+  name: string;
+  orgName: string;
+  createdAt: string;
+}
+
+export interface CrmStatusBreakdown {
+  status: string;
+  count: number;
 }
 
 // ===== N8N Types =====

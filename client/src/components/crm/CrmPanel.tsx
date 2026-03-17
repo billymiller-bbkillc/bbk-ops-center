@@ -4,7 +4,13 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { useApi } from '@/hooks/useApi';
 import { formatUptime } from '@/lib/utils';
-import type { CrmHealth, CrmStats, CrmPipeline } from '@shared/types';
+import type {
+  CrmHealth,
+  CrmGlobalStats,
+  CrmOrganization,
+  CrmActivity,
+  CrmStatusBreakdown,
+} from '@shared/types';
 import {
   Activity,
   Users,
@@ -15,9 +21,14 @@ import {
   Zap,
   AlertTriangle,
   MemoryStick,
-  GitBranch,
-  ArrowRight,
+  Globe,
+  UserCheck,
+  TrendingUp,
+  BarChart3,
+  CreditCard,
 } from 'lucide-react';
+
+// ===== Helpers =====
 
 function getHealthVariant(status: string): 'success' | 'warning' | 'error' {
   if (status === 'ok' || status === 'healthy') return 'success';
@@ -43,6 +54,47 @@ function formatMs(ms: number): string {
   return `${(ms / 1000).toFixed(2)}s`;
 }
 
+function timeAgo(dateStr: string): string {
+  const now = Date.now();
+  const then = new Date(dateStr).getTime();
+  const diff = now - then;
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  return `${days}d ago`;
+}
+
+function getActivityIcon(type: string) {
+  switch (type) {
+    case 'lead': return <Target className="w-3 h-3 text-blue-400" />;
+    case 'deal': return <Handshake className="w-3 h-3 text-green-400" />;
+    case 'client': return <Users className="w-3 h-3 text-purple-400" />;
+    default: return <Activity className="w-3 h-3" />;
+  }
+}
+
+function getStatusColor(status: string): string {
+  const s = status?.toLowerCase();
+  if (s === 'active' || s === 'paid' || s === 'won' || s === 'converted' || s === 'qualified') return 'text-green-400';
+  if (s === 'inactive' || s === 'lost' || s === 'cold') return 'text-red-400';
+  if (s === 'pending' || s === 'warm' || s === 'contacted' || s === 'negotiation' || s === 'proposal') return 'text-yellow-400';
+  if (s === 'new') return 'text-blue-400';
+  return 'text-muted-foreground';
+}
+
+function getPaymentBadge(status: string): 'success' | 'warning' | 'error' | 'secondary' {
+  const s = status?.toLowerCase();
+  if (s === 'paid' || s === 'active') return 'success';
+  if (s === 'pending' || s === 'trialing') return 'warning';
+  if (s === 'failed' || s === 'overdue') return 'error';
+  return 'secondary';
+}
+
+// ===== Stat Card =====
+
 function StatCard({ icon: Icon, label, value, color }: {
   icon: React.ElementType;
   label: string;
@@ -66,10 +118,66 @@ function StatCard({ icon: Icon, label, value, color }: {
   );
 }
 
+// ===== Breakdown Card =====
+
+function BreakdownCard({ title, icon: Icon, data, colorFn }: {
+  title: string;
+  icon: React.ElementType;
+  data: CrmStatusBreakdown[] | null;
+  colorFn: (s: string) => string;
+}) {
+  const total = data?.reduce((sum, d) => sum + d.count, 0) || 0;
+
+  return (
+    <Card className="h-full">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm flex items-center gap-2">
+          <Icon className="w-4 h-4" />
+          {title}
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        {data && data.length > 0 ? (
+          <div className="space-y-2">
+            {data.map(item => {
+              const pct = total > 0 ? (item.count / total) * 100 : 0;
+              return (
+                <div key={item.status} className="space-y-1">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className={`capitalize font-medium ${colorFn(item.status)}`}>
+                      {item.status}
+                    </span>
+                    <span className="font-mono-nums text-muted-foreground">
+                      {item.count} ({pct.toFixed(0)}%)
+                    </span>
+                  </div>
+                  <div className="h-1.5 bg-accent rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-primary/60 rounded-full transition-all"
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <p className="text-xs text-muted-foreground">No data available</p>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// ===== Main Panel =====
+
 export function CrmPanel() {
   const { data: health } = useApi<CrmHealth>('/api/crm/health');
-  const { data: stats } = useApi<CrmStats>('/api/crm/stats');
-  const { data: pipelines } = useApi<CrmPipeline[]>('/api/crm/pipelines');
+  const { data: stats } = useApi<CrmGlobalStats>('/api/crm/stats');
+  const { data: orgs } = useApi<CrmOrganization[]>('/api/crm/organizations');
+  const { data: activity } = useApi<CrmActivity[]>('/api/crm/activity');
+  const { data: leadBreakdown } = useApi<CrmStatusBreakdown[]>('/api/crm/leads/by-status');
+  const { data: dealBreakdown } = useApi<CrmStatusBreakdown[]>('/api/crm/deals/by-stage');
 
   const memPct = health && health.memory.total > 0
     ? (health.memory.used / health.memory.total) * 100
@@ -80,18 +188,35 @@ export function CrmPanel() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-semibold">SalesPipe CRM</h2>
-          <p className="text-sm text-muted-foreground">Live monitoring of your CRM platform</p>
+          <h2 className="text-lg font-semibold">SalesPipe CRM — Super Admin</h2>
+          <p className="text-sm text-muted-foreground">Cross-tenant overview • Direct database connection</p>
         </div>
-        {health && (
-          <Badge variant={getHealthVariant(health.status)}>
-            {getHealthLabel(health.status)}
-          </Badge>
-        )}
+        <div className="flex items-center gap-2">
+          {stats && (
+            <Badge variant="secondary" className="text-[10px]">
+              Updated {new Date(stats.lastChecked).toLocaleTimeString()}
+            </Badge>
+          )}
+          {health && (
+            <Badge variant={getHealthVariant(health.status)}>
+              {getHealthLabel(health.status)}
+            </Badge>
+          )}
+        </div>
       </div>
 
-      {/* CRM Status + Performance */}
-      <div className="grid grid-cols-3 gap-4">
+      {/* Row 1 — Global Stats Cards */}
+      <div className="grid grid-cols-6 gap-3">
+        <StatCard icon={Globe} label="Organizations" value={stats?.totalOrganizations ?? '—'} color="bg-indigo-500" />
+        <StatCard icon={UserCheck} label="Users" value={stats?.totalUsers ?? '—'} color="bg-cyan-500" />
+        <StatCard icon={Target} label="Leads" value={stats?.totalLeads ?? '—'} color="bg-blue-500" />
+        <StatCard icon={Handshake} label="Deals" value={stats?.totalDeals ?? '—'} color="bg-green-500" />
+        <StatCard icon={Users} label="Clients" value={stats?.totalClients ?? '—'} color="bg-purple-500" />
+        <StatCard icon={Building2} label="Companies" value={stats?.totalCompanies ?? '—'} color="bg-orange-500" />
+      </div>
+
+      {/* Row 2 — Health + Performance */}
+      <div className="grid grid-cols-2 gap-4">
         {/* Health Card */}
         <Card className="relative overflow-hidden">
           <div className={`absolute top-0 left-0 right-0 h-0.5 ${
@@ -101,7 +226,7 @@ export function CrmPanel() {
           <CardHeader className="pb-2">
             <CardTitle className="text-sm flex items-center gap-2">
               <Activity className="w-4 h-4" />
-              CRM Status
+              CRM Application Health
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
@@ -162,115 +287,127 @@ export function CrmPanel() {
             </div>
           </CardContent>
         </Card>
+      </div>
 
-        {/* Quick Stats */}
-        <Card>
+      {/* Row 3 — Tenant Directory Table */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm flex items-center gap-2">
+            <Globe className="w-4 h-4" />
+            Tenant Directory
+          </CardTitle>
+          <CardDescription className="text-[10px]">
+            All organizations sorted by activity
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {orgs && orgs.length > 0 ? (
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b border-border text-muted-foreground">
+                    <th className="text-left py-2 pr-4 font-medium">Organization</th>
+                    <th className="text-left py-2 pr-4 font-medium">Plan</th>
+                    <th className="text-left py-2 pr-4 font-medium">Status</th>
+                    <th className="text-left py-2 pr-4 font-medium">Payment</th>
+                    <th className="text-right py-2 pr-4 font-medium">Users</th>
+                    <th className="text-right py-2 pr-4 font-medium">Leads</th>
+                    <th className="text-right py-2 pr-4 font-medium">Deals</th>
+                    <th className="text-right py-2 font-medium">Clients</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {orgs.map(org => (
+                    <tr key={org.id} className="border-b border-border/50 hover:bg-accent/30 transition-colors">
+                      <td className="py-2 pr-4">
+                        <div className="font-medium">{org.name}</div>
+                        <div className="text-[10px] text-muted-foreground">
+                          {org.seats} seat{org.seats !== 1 ? 's' : ''}
+                        </div>
+                      </td>
+                      <td className="py-2 pr-4">
+                        <Badge variant="secondary" className="text-[10px] capitalize">
+                          {org.subscriptionTier}
+                        </Badge>
+                      </td>
+                      <td className="py-2 pr-4">
+                        <span className={`capitalize ${getStatusColor(org.status)}`}>
+                          {org.status}
+                        </span>
+                      </td>
+                      <td className="py-2 pr-4">
+                        <Badge variant={getPaymentBadge(org.paymentStatus)} className="text-[10px] capitalize">
+                          {org.paymentStatus}
+                        </Badge>
+                      </td>
+                      <td className="py-2 pr-4 text-right font-mono-nums">{org.userCount}</td>
+                      <td className="py-2 pr-4 text-right font-mono-nums">{org.leadCount}</td>
+                      <td className="py-2 pr-4 text-right font-mono-nums">{org.dealCount}</td>
+                      <td className="py-2 text-right font-mono-nums">{org.clientCount}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <p className="text-xs text-muted-foreground">Loading organizations...</p>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Row 4 — Activity Feed + Breakdowns */}
+      <div className="grid grid-cols-3 gap-4">
+        {/* Activity Feed */}
+        <Card className="h-full">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm flex items-center gap-2">
-              <Target className="w-4 h-4" />
-              Quick Stats
+              <TrendingUp className="w-4 h-4" />
+              Recent Activity
             </CardTitle>
-            {stats && (
-              <CardDescription className="text-[10px]">
-                Updated {new Date(stats.lastChecked).toLocaleTimeString()}
-              </CardDescription>
-            )}
+            <CardDescription className="text-[10px]">
+              Cross-tenant feed
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded bg-blue-500/20 flex items-center justify-center">
-                  <Target className="w-4 h-4 text-blue-400" />
-                </div>
-                <div>
-                  <p className="text-lg font-bold font-mono-nums">{stats?.leads ?? '—'}</p>
-                  <p className="text-[10px] text-muted-foreground">Leads</p>
-                </div>
+            {activity && activity.length > 0 ? (
+              <div className="space-y-2 max-h-[320px] overflow-y-auto pr-1">
+                {activity.map((item, idx) => (
+                  <div key={idx} className="flex items-start gap-2 py-1 border-b border-border/30 last:border-0">
+                    <div className="mt-0.5">{getActivityIcon(item.type)}</div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-medium truncate">{item.name}</p>
+                      <p className="text-[10px] text-muted-foreground truncate">
+                        {item.orgName} • {timeAgo(item.createdAt)}
+                      </p>
+                    </div>
+                    <Badge variant="secondary" className="text-[9px] capitalize flex-shrink-0">
+                      {item.type}
+                    </Badge>
+                  </div>
+                ))}
               </div>
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded bg-green-500/20 flex items-center justify-center">
-                  <Handshake className="w-4 h-4 text-green-400" />
-                </div>
-                <div>
-                  <p className="text-lg font-bold font-mono-nums">{stats?.deals ?? '—'}</p>
-                  <p className="text-[10px] text-muted-foreground">Deals</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded bg-purple-500/20 flex items-center justify-center">
-                  <Users className="w-4 h-4 text-purple-400" />
-                </div>
-                <div>
-                  <p className="text-lg font-bold font-mono-nums">{stats?.clients ?? '—'}</p>
-                  <p className="text-[10px] text-muted-foreground">Clients</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded bg-orange-500/20 flex items-center justify-center">
-                  <Building2 className="w-4 h-4 text-orange-400" />
-                </div>
-                <div>
-                  <p className="text-lg font-bold font-mono-nums">{stats?.companies ?? '—'}</p>
-                  <p className="text-[10px] text-muted-foreground">Companies</p>
-                </div>
-              </div>
-            </div>
+            ) : (
+              <p className="text-xs text-muted-foreground">No recent activity</p>
+            )}
           </CardContent>
         </Card>
-      </div>
 
-      {/* Entity Count Cards (larger) */}
-      <div className="grid grid-cols-4 gap-4">
-        <StatCard icon={Target} label="Leads" value={stats?.leads ?? '—'} color="bg-blue-500" />
-        <StatCard icon={Handshake} label="Deals" value={stats?.deals ?? '—'} color="bg-green-500" />
-        <StatCard icon={Users} label="Clients" value={stats?.clients ?? '—'} color="bg-purple-500" />
-        <StatCard icon={Building2} label="Companies" value={stats?.companies ?? '—'} color="bg-orange-500" />
-      </div>
+        {/* Leads by Status */}
+        <BreakdownCard
+          title="Leads by Status"
+          icon={BarChart3}
+          data={leadBreakdown}
+          colorFn={getStatusColor}
+        />
 
-      {/* Pipeline View */}
-      {pipelines && pipelines.length > 0 && (
-        <div className="space-y-3">
-          <h3 className="text-sm font-semibold flex items-center gap-2">
-            <GitBranch className="w-4 h-4" />
-            Pipelines
-          </h3>
-          {pipelines.map(pipeline => (
-            <Card key={pipeline.id}>
-              <CardHeader className="pb-2">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-sm">{pipeline.name}</CardTitle>
-                  {pipeline.isDefault && (
-                    <Badge variant="secondary" className="text-[10px]">Default</Badge>
-                  )}
-                </div>
-              </CardHeader>
-              <CardContent>
-                {pipeline.stages.length > 0 ? (
-                  <div className="flex items-center gap-1 overflow-x-auto">
-                    {pipeline.stages
-                      .sort((a, b) => a.orderIndex - b.orderIndex)
-                      .map((stage, idx) => (
-                        <React.Fragment key={stage.id}>
-                          <div className="flex-shrink-0 bg-accent rounded-lg px-3 py-2 text-center min-w-[100px]">
-                            <p className="text-xs font-medium truncate">{stage.name}</p>
-                            {stage.dealCount !== undefined && (
-                              <p className="text-lg font-bold font-mono-nums">{stage.dealCount}</p>
-                            )}
-                          </div>
-                          {idx < pipeline.stages.length - 1 && (
-                            <ArrowRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-                          )}
-                        </React.Fragment>
-                      ))}
-                  </div>
-                ) : (
-                  <p className="text-xs text-muted-foreground">No stages configured</p>
-                )}
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
+        {/* Deals by Stage */}
+        <BreakdownCard
+          title="Deals by Stage"
+          icon={CreditCard}
+          data={dealBreakdown}
+          colorFn={getStatusColor}
+        />
+      </div>
 
       {/* Error state */}
       {health?.status === 'unreachable' && (
