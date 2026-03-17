@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { getAgents } from '../lib/openclaw';
 import { getNodeHealth } from '../lib/system';
 import { getCrmHealth } from '../lib/salespipe';
+import { getN8nSummary, getWorkflows, getExecutions } from '../lib/n8n';
 
 const router = Router();
 
@@ -44,6 +45,12 @@ export async function pollAndBroadcast() {
     if (crmHealth) {
       broadcast('crm-update', crmHealth);
     }
+
+    broadcast('n8n-update', {
+      summary: getN8nSummary(),
+      workflows: getWorkflows(),
+      executions: getExecutions(),
+    });
 
     broadcast('heartbeat', { timestamp: new Date().toISOString() });
   } catch (err) {

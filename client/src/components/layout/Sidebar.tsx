@@ -8,9 +8,10 @@ import {
   BarChart3,
   Zap,
   Users,
+  Workflow,
 } from 'lucide-react';
 
-export type Panel = 'dashboard' | 'fleet' | 'costs' | 'kanban' | 'health' | 'crm';
+export type Panel = 'dashboard' | 'fleet' | 'costs' | 'kanban' | 'health' | 'crm' | 'n8n';
 
 interface SidebarProps {
   activePanel: Panel;
@@ -24,6 +25,7 @@ const navItems: { id: Panel; label: string; icon: React.ElementType }[] = [
   { id: 'kanban', label: 'Task Board', icon: LayoutGrid },
   { id: 'health', label: 'System Health', icon: Activity },
   { id: 'crm', label: 'CRM', icon: Users },
+  { id: 'n8n', label: 'N8N', icon: Workflow },
 ];
 
 export function Sidebar({ activePanel, onNavigate }: SidebarProps) {

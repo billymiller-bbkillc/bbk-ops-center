@@ -8,7 +8,9 @@ import taskRoutes from './routes/tasks';
 import healthRoutes from './routes/health';
 import sseRoutes, { pollAndBroadcast } from './routes/sse';
 import crmRoutes from './routes/crm';
+import n8nRoutes from './routes/n8n';
 import { startCrmPolling } from './lib/salespipe';
+import { startN8nPolling } from './lib/n8n';
 
 const app = express();
 const PORT = process.env.OPS_PORT || 3001;
@@ -27,6 +29,7 @@ app.use('/api/tasks', taskRoutes);
 app.use('/api/health', healthRoutes);
 app.use('/api/sse', sseRoutes);
 app.use('/api/crm', crmRoutes);
+app.use('/api/n8n', n8nRoutes);
 
 // Health check
 app.get('/api/status', (_req, res) => {
@@ -35,6 +38,9 @@ app.get('/api/status', (_req, res) => {
 
 // Start CRM polling (every 30s)
 startCrmPolling();
+
+// Start N8N polling (every 30s)
+startN8nPolling();
 
 // Poll real metrics every 5 seconds and broadcast via SSE
 setInterval(pollAndBroadcast, 5000);

@@ -115,6 +115,40 @@ export interface CrmPipeline {
   stages: { id: string; name: string; orderIndex: number; dealCount?: number }[];
 }
 
+// ===== N8N Types =====
+export interface N8nWorkflow {
+  id: string;
+  name: string;
+  active: boolean;
+  isArchived: boolean;
+  createdAt: string;
+  updatedAt: string;
+  nodeCount: number;
+}
+
+export interface N8nExecution {
+  id: string;
+  workflowId: string;
+  workflowName?: string;
+  status: string;
+  finished: boolean;
+  mode: string;
+  startedAt: string;
+  stoppedAt: string | null;
+  duration?: number; // ms
+}
+
+export interface N8nSummary {
+  totalWorkflows: number;
+  activeWorkflows: number;
+  inactiveWorkflows: number;
+  totalExecutions: number;
+  successfulExecutions: number;
+  failedExecutions: number;
+  lastExecutionAt: string | null;
+  lastChecked: string;
+}
+
 // ===== SSE Types =====
 export type SSEEventType =
   | 'agent-update'
@@ -122,6 +156,7 @@ export type SSEEventType =
   | 'cost-update'
   | 'task-update'
   | 'crm-update'
+  | 'n8n-update'
   | 'heartbeat';
 
 export interface SSEEvent {

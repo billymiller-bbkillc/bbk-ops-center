@@ -7,6 +7,7 @@ import { CostCenter } from '@/components/costs/CostCenter';
 import { KanbanBoard } from '@/components/kanban/KanbanBoard';
 import { SystemHealth } from '@/components/health/SystemHealth';
 import { CrmPanel } from '@/components/crm/CrmPanel';
+import { N8nPanel } from '@/components/n8n/N8nPanel';
 import { useSSE } from '@/hooks/useSSE';
 
 function App() {
@@ -21,6 +22,7 @@ function App() {
     'health-update': (data) => {},
     'cost-update': (data) => {},
     'crm-update': (data) => {},
+    'n8n-update': (data) => {},
     'task-update': (data) => {},
   });
 
@@ -32,6 +34,7 @@ function App() {
       case 'kanban': return <KanbanBoard />;
       case 'health': return <SystemHealth />;
       case 'crm': return <CrmPanel />;
+      case 'n8n': return <N8nPanel />;
     }
   }, [activePanel]);
 
