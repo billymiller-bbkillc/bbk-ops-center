@@ -91,12 +91,37 @@ export interface NodeHealth {
   agentCount: number;
 }
 
+// ===== CRM Types =====
+export interface CrmHealth {
+  status: string;
+  uptime: number;
+  memory: { used: number; total: number; rss: number };
+  performance: { totalRequests: number; averageResponseTime: number; errorCount: number };
+  lastChecked: string;
+}
+
+export interface CrmStats {
+  leads: number;
+  deals: number;
+  clients: number;
+  companies: number;
+  lastChecked: string;
+}
+
+export interface CrmPipeline {
+  id: string;
+  name: string;
+  isDefault: boolean;
+  stages: { id: string; name: string; orderIndex: number; dealCount?: number }[];
+}
+
 // ===== SSE Types =====
 export type SSEEventType =
   | 'agent-update'
   | 'health-update'
   | 'cost-update'
   | 'task-update'
+  | 'crm-update'
   | 'heartbeat';
 
 export interface SSEEvent {

@@ -7,9 +7,10 @@ import {
   Activity,
   BarChart3,
   Zap,
+  Users,
 } from 'lucide-react';
 
-export type Panel = 'dashboard' | 'fleet' | 'costs' | 'kanban' | 'health';
+export type Panel = 'dashboard' | 'fleet' | 'costs' | 'kanban' | 'health' | 'crm';
 
 interface SidebarProps {
   activePanel: Panel;
@@ -22,6 +23,7 @@ const navItems: { id: Panel; label: string; icon: React.ElementType }[] = [
   { id: 'costs', label: 'Cost Center', icon: DollarSign },
   { id: 'kanban', label: 'Task Board', icon: LayoutGrid },
   { id: 'health', label: 'System Health', icon: Activity },
+  { id: 'crm', label: 'CRM', icon: Users },
 ];
 
 export function Sidebar({ activePanel, onNavigate }: SidebarProps) {

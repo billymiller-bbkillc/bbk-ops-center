@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { getAgents } from '../lib/openclaw';
 import { getNodeHealth } from '../lib/system';
+import { getCrmHealth } from '../lib/salespipe';
 
 const router = Router();
 
@@ -39,6 +40,11 @@ export async function pollAndBroadcast() {
 
     broadcast('agent-update', agents);
     broadcast('health-update', [health]);
+    const crmHealth = getCrmHealth();
+    if (crmHealth) {
+      broadcast('crm-update', crmHealth);
+    }
+
     broadcast('heartbeat', { timestamp: new Date().toISOString() });
   } catch (err) {
     console.error('SSE poll error:', err);

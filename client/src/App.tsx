@@ -6,6 +6,7 @@ import { FleetMonitor } from '@/components/fleet/FleetMonitor';
 import { CostCenter } from '@/components/costs/CostCenter';
 import { KanbanBoard } from '@/components/kanban/KanbanBoard';
 import { SystemHealth } from '@/components/health/SystemHealth';
+import { CrmPanel } from '@/components/crm/CrmPanel';
 import { useSSE } from '@/hooks/useSSE';
 
 function App() {
@@ -19,6 +20,7 @@ function App() {
     },
     'health-update': (data) => {},
     'cost-update': (data) => {},
+    'crm-update': (data) => {},
     'task-update': (data) => {},
   });
 
@@ -29,6 +31,7 @@ function App() {
       case 'costs': return <CostCenter />;
       case 'kanban': return <KanbanBoard />;
       case 'health': return <SystemHealth />;
+      case 'crm': return <CrmPanel />;
     }
   }, [activePanel]);
 
