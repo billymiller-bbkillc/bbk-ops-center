@@ -87,7 +87,7 @@ function getSessionFiles(agentName: string): string[] {
 
 function getAgentDirs(): string[] {
   try {
-    return fs.readdirSync(AGENTS_DIR)
+    const dirs = fs.readdirSync(AGENTS_DIR)
       .filter(d => !SKIP_DIRS.has(d))
       .filter(d => {
         try {
@@ -96,7 +96,9 @@ function getAgentDirs(): string[] {
           return false;
         }
       });
-  } catch {
+    return dirs;
+  } catch (err) {
+    console.error(`[ERROR] Failed to read agents directory at ${AGENTS_DIR}:`, err instanceof Error ? err.message : err);
     return [];
   }
 }
