@@ -179,7 +179,7 @@ export async function getAgents(): Promise<Agent[]> {
 
     if (gatewayMatch?.active || gatewayMatch?.running) {
       status = 'busy';
-    } else if (ageMs < 60 * 60 * 1000) {
+    } else if (ageMs < 15 * 60 * 1000) {
       status = 'online';
     } else {
       status = 'idle';
