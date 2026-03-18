@@ -4,7 +4,7 @@ import { StatCard } from '@/components/ui/stat-card';
 import { ChartCard } from '@/components/ui/chart-card';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { formatCost, formatTokens, formatUptime } from '@/lib/utils';
-import type { Bot, NodeHealth, CostSummary, Task } from '@shared/types';
+import type { Agent, NodeHealth, CostSummary, Task } from '@shared/types';
 import {
   Bot, DollarSign, Activity, LayoutGrid, Clock,
 } from 'lucide-react';
@@ -31,7 +31,7 @@ const CHART_TOOLTIP_STYLE = {
 };
 
 export function Overview() {
-  const { data: agents } = useApi<Bot[]>('/api/agents');
+  const { data: agents } = useApi<Agent[]>('/api/agents');
   const { data: nodes } = useApi<NodeHealth[]>('/api/health');
   const { data: costSummary } = useApi<CostSummary>('/api/costs/summary?period=month');
   const { data: tasks } = useApi<Task[]>('/api/tasks');
