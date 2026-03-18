@@ -289,7 +289,10 @@ function CreateTaskModal({
 
       reset();
       onOpenChange(false);
-      onCreated();
+      // Give GitHub API 1.5 seconds to index the new issue before we fetch again
+      setTimeout(() => {
+        onCreated();
+      }, 1500);
     } catch (err: any) {
       setError(err.message || 'Failed to create task');
     } finally {
