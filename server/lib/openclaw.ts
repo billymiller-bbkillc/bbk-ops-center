@@ -173,18 +173,16 @@ export async function getAgents(): Promise<Agent[]> {
     }
 
     // Determine status
-    let status: AgentStatus = 'offline';
+    let status: AgentStatus = 'idle';
     const lastSeenTs = latestSession?.updatedAt || 0;
     const ageMs = Date.now() - lastSeenTs;
 
     if (gatewayMatch?.active || gatewayMatch?.running) {
       status = 'busy';
-    } else if (ageMs < 5 * 60 * 1000) {
-      status = 'online';
     } else if (ageMs < 60 * 60 * 1000) {
       status = 'online';
     } else {
-      status = 'offline';
+      status = 'idle';
     }
 
     // Calculate uptime as time since first session

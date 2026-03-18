@@ -17,6 +17,7 @@ import {
 const STATUS_COLORS: Record<string, string> = {
   online: '#22c55e',
   busy: '#eab308',
+  idle: '#71717a',
   offline: '#71717a',
   error: '#ef4444',
 };

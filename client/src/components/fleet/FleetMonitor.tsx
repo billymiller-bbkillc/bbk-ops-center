@@ -12,10 +12,11 @@ const STATUS_BORDER_COLORS: Record<string, string> = {
   online: 'border-t-emerald-500',
   busy: 'border-t-amber-500',
   error: 'border-t-red-500',
+  idle: 'border-t-zinc-600',
   offline: 'border-t-zinc-600',
 };
 
-const FILTER_TABS = ['all', 'online', 'busy', 'offline', 'error'] as const;
+const FILTER_TABS = ['all', 'online', 'busy', 'idle', 'error'] as const;
 type FilterTab = typeof FILTER_TABS[number];
 
 function AgentDetail({ agent, onBack }: { agent: Agent; onBack: () => void }) {
@@ -124,7 +125,7 @@ export function FleetMonitor() {
         a.businessUnit.toLowerCase().includes(q)
       );
     }
-    const statusOrder = { busy: 0, online: 1, error: 2, offline: 3 };
+    const statusOrder = { busy: 0, online: 1, error: 2, idle: 3, offline: 3 };
     return [...list].sort((a, b) => (statusOrder[a.status] ?? 9) - (statusOrder[b.status] ?? 9));
   }, [agents, filter, search]);
 
@@ -144,7 +145,7 @@ export function FleetMonitor() {
       <div>
         <h2 className="text-lg font-semibold tracking-tight">Bots Monitor</h2>
         <p className="text-sm text-muted-foreground">
-          {agents?.filter(a => a.status !== 'offline').length || 0} of {agents?.length || 0} agents active
+          {agents?.filter(a => a.status !== 'idle' && a.status !== 'offline').length || 0} of {agents?.length || 0} bots active
         </p>
       </div>
 

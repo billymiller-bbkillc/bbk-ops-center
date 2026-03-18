@@ -17,6 +17,7 @@ const statusConfig: Record<string, { bg: string; text: string; dot: string; puls
   warning: { bg: 'bg-amber-500/15', text: 'text-amber-400', dot: 'bg-amber-400', pulse: true },
   error: { bg: 'bg-red-500/15', text: 'text-red-400', dot: 'bg-red-400', pulse: true },
   critical: { bg: 'bg-red-500/15', text: 'text-red-400', dot: 'bg-red-400', pulse: true },
+  idle: { bg: 'bg-zinc-500/15', text: 'text-zinc-400', dot: 'bg-zinc-500', pulse: false },
   offline: { bg: 'bg-zinc-500/15', text: 'text-zinc-400', dot: 'bg-zinc-500', pulse: false },
 };
 
