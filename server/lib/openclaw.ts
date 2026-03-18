@@ -69,7 +69,8 @@ function readSessionsJson(agentName: string): SessionsJson {
   const filePath = path.join(AGENTS_DIR, agentName, 'sessions', 'sessions.json');
   try {
     return JSON.parse(fs.readFileSync(filePath, 'utf-8'));
-  } catch {
+  } catch (err) {
+    console.error(`[ERROR] Failed to read or parse ${filePath}:`, err instanceof Error ? err.message : err);
     return {};
   }
 }

@@ -5,7 +5,7 @@ const router = Router();
 
 router.get('/', async (_req, res) => {
   try {
-    const agents = await getAgents();
+    console.log('[DEBUG] Calling getAgents with AGENTS_DIR:', process.env.OPENCLAW_AGENTS_DIR); console.log('[DEBUG] Calling getAgents with AGENTS_DIR:', process.env.OPENCLAW_AGENTS_DIR); const agents = await getAgents();
     res.json({ success: true, data: agents });
   } catch (err) {
     console.error('Error fetching agents:', err);
