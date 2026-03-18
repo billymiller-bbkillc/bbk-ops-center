@@ -100,58 +100,53 @@ export interface CrmHealth {
   lastChecked: string;
 }
 
-// Legacy single-org stats (kept for backward compat)
-export interface CrmStats {
-  leads: number;
-  deals: number;
-  clients: number;
-  companies: number;
-  lastChecked: string;
-}
-
-export interface CrmPipeline {
-  id: string;
-  name: string;
-  isDefault: boolean;
-  stages: { id: string; name: string; orderIndex: number; dealCount?: number }[];
-}
-
-// Super Admin cross-tenant types
-export interface CrmGlobalStats {
-  totalOrganizations: number;
+// Super Admin CRM types — simplified for tenant/user/login tracking
+export interface CrmQuickStats {
+  totalTenants: number;
   totalUsers: number;
-  totalLeads: number;
-  totalDeals: number;
-  totalClients: number;
-  totalCompanies: number;
+  activeTenants: number;
   lastChecked: string;
 }
 
-export interface CrmOrganization {
+export interface CrmTenant {
   id: string;
   name: string;
   status: string;
   planType: string;
   subscriptionTier: string;
-  seats: number;
-  paymentStatus: string;
-  createdAt: string;
   userCount: number;
-  leadCount: number;
-  dealCount: number;
-  clientCount: number;
-}
-
-export interface CrmActivity {
-  type: 'lead' | 'deal' | 'client';
-  name: string;
-  orgName: string;
   createdAt: string;
 }
 
-export interface CrmStatusBreakdown {
-  status: string;
-  count: number;
+export interface CrmUser {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  role: string;
+  organizationId: string;
+  orgName: string;
+  lastLoginAt: string | null;
+  loginCount: number;
+  createdAt: string;
+}
+
+export interface CrmLoginEvent {
+  id: string;
+  email: string;
+  orgName: string;
+  eventType: 'login' | 'logout' | 'login_failed';
+  ipAddress: string | null;
+  userAgent: string | null;
+  createdAt: string;
+}
+
+export interface CrmLoginStats {
+  totalLogins: number;
+  uniqueUsers: number;
+  loginsToday: number;
+  loginsThisWeek: number;
+  loginsThisMonth: number;
 }
 
 // ===== N8N Types =====
@@ -202,6 +197,23 @@ export interface SSEEvent {
   type: SSEEventType;
   data: unknown;
   timestamp: string;
+}
+
+// ===== GitHub Task Types =====
+export interface GitHubTask {
+  id: string; // "repo/issueNumber"
+  repo: string;
+  issueNumber: number;
+  title: string;
+  description: string;
+  priority: TaskPriority;
+  column: TaskColumn;
+  assignee: string | null;
+  assignees: string[];
+  labels: string[];
+  url: string; // GitHub issue URL
+  createdAt: string;
+  updatedAt: string;
 }
 
 // ===== API Response Types =====

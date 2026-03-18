@@ -33,81 +33,89 @@ function setCache<T>(key: string, data: T): void {
 }
 
 // ===== Types =====
-export interface CrmGlobalStats {
-  totalOrganizations: number;
+export interface CrmQuickStats {
+  totalTenants: number;
   totalUsers: number;
-  totalLeads: number;
-  totalDeals: number;
-  totalClients: number;
-  totalCompanies: number;
+  activeTenants: number;
   lastChecked: string;
 }
 
-export interface CrmOrganization {
+export interface CrmTenant {
   id: string;
   name: string;
   status: string;
   planType: string;
   subscriptionTier: string;
-  seats: number;
-  paymentStatus: string;
-  createdAt: string;
   userCount: number;
-  leadCount: number;
-  dealCount: number;
-  clientCount: number;
-}
-
-export interface CrmActivity {
-  type: 'lead' | 'deal' | 'client';
-  name: string;
-  orgName: string;
   createdAt: string;
 }
 
-export interface CrmStatusBreakdown {
-  status: string;
-  count: number;
+export interface CrmUser {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  role: string;
+  organizationId: string;
+  orgName: string;
+  lastLoginAt: string | null;
+  loginCount: number;
+  createdAt: string;
+}
+
+export interface CrmLoginEvent {
+  id: string;
+  email: string;
+  orgName: string;
+  eventType: 'login' | 'logout' | 'login_failed';
+  ipAddress: string | null;
+  userAgent: string | null;
+  createdAt: string;
+}
+
+export interface CrmLoginStats {
+  totalLogins: number;
+  uniqueUsers: number;
+  loginsToday: number;
+  loginsThisWeek: number;
+  loginsThisMonth: number;
 }
 
 // ===== Queries =====
 
-export async function getGlobalStats(): Promise<CrmGlobalStats> {
-  const cached = getCached<CrmGlobalStats>('globalStats');
+export async function getQuickStats(): Promise<CrmQuickStats> {
+  const cached = getCached<CrmQuickStats>('quickStats');
   if (cached) return cached;
 
   try {
     const result = await pool.query(`
       SELECT
-        (SELECT COUNT(*) FROM organizations)::int AS total_organizations,
+        (SELECT COUNT(*) FROM organizations)::int AS total_tenants,
         (SELECT COUNT(*) FROM users)::int AS total_users,
-        (SELECT COUNT(*) FROM leads)::int AS total_leads,
-        (SELECT COUNT(*) FROM deals)::int AS total_deals,
-        (SELECT COUNT(*) FROM clients)::int AS total_clients,
-        (SELECT COUNT(*) FROM companies)::int AS total_companies
+        (SELECT COUNT(DISTINCT o.id) FROM organizations o
+         INNER JOIN users u ON u.organization_id = o.id
+         WHERE u.last_login_at >= NOW() - INTERVAL '30 days'
+        )::int AS active_tenants
     `);
 
     const row = result.rows[0];
-    const stats: CrmGlobalStats = {
-      totalOrganizations: row.total_organizations,
+    const stats: CrmQuickStats = {
+      totalTenants: row.total_tenants,
       totalUsers: row.total_users,
-      totalLeads: row.total_leads,
-      totalDeals: row.total_deals,
-      totalClients: row.total_clients,
-      totalCompanies: row.total_companies,
+      activeTenants: row.active_tenants,
       lastChecked: new Date().toISOString(),
     };
 
-    setCache('globalStats', stats);
+    setCache('quickStats', stats);
     return stats;
   } catch (err) {
-    console.error('CRM DB getGlobalStats failed:', err);
+    console.error('CRM DB getQuickStats failed:', err);
     throw err;
   }
 }
 
-export async function getOrganizations(): Promise<CrmOrganization[]> {
-  const cached = getCached<CrmOrganization[]>('organizations');
+export async function getTenantOverview(): Promise<CrmTenant[]> {
+  const cached = getCached<CrmTenant[]>('tenantOverview');
   if (cached) return cached;
 
   try {
@@ -118,132 +126,172 @@ export async function getOrganizations(): Promise<CrmOrganization[]> {
         COALESCE(o.status, 'active') AS status,
         COALESCE(o.plan_type, 'free') AS plan_type,
         COALESCE(o.subscription_tier, 'free') AS subscription_tier,
-        COALESCE(o.seats, 1) AS seats,
-        COALESCE(o.payment_status, 'none') AS payment_status,
         o.created_at,
-        COALESCE(u.user_count, 0)::int AS user_count,
-        COALESCE(l.lead_count, 0)::int AS lead_count,
-        COALESCE(d.deal_count, 0)::int AS deal_count,
-        COALESCE(c.client_count, 0)::int AS client_count
+        COALESCE(u.user_count, 0)::int AS user_count
       FROM organizations o
-      LEFT JOIN (SELECT organization_id, COUNT(*) AS user_count FROM users GROUP BY organization_id) u ON u.organization_id = o.id
-      LEFT JOIN (SELECT organization_id, COUNT(*) AS lead_count FROM leads GROUP BY organization_id) l ON l.organization_id = o.id
-      LEFT JOIN (SELECT organization_id, COUNT(*) AS deal_count FROM deals GROUP BY organization_id) d ON d.organization_id = o.id
-      LEFT JOIN (SELECT organization_id, COUNT(*) AS client_count FROM clients GROUP BY organization_id) c ON c.organization_id = o.id
-      ORDER BY (COALESCE(l.lead_count, 0) + COALESCE(d.deal_count, 0)) DESC, o.name ASC
+      LEFT JOIN (
+        SELECT organization_id, COUNT(*) AS user_count
+        FROM users GROUP BY organization_id
+      ) u ON u.organization_id = o.id
+      ORDER BY u.user_count DESC NULLS LAST, o.name ASC
     `);
 
-    const orgs: CrmOrganization[] = result.rows.map(row => ({
+    const tenants: CrmTenant[] = result.rows.map(row => ({
       id: row.id,
       name: row.name,
       status: row.status,
       planType: row.plan_type,
       subscriptionTier: row.subscription_tier,
-      seats: row.seats,
-      paymentStatus: row.payment_status,
-      createdAt: row.created_at?.toISOString?.() || String(row.created_at),
       userCount: row.user_count,
-      leadCount: row.lead_count,
-      dealCount: row.deal_count,
-      clientCount: row.client_count,
-    }));
-
-    setCache('organizations', orgs);
-    return orgs;
-  } catch (err) {
-    console.error('CRM DB getOrganizations failed:', err);
-    throw err;
-  }
-}
-
-export async function getRecentActivity(limit = 20): Promise<CrmActivity[]> {
-  const cached = getCached<CrmActivity[]>(`activity_${limit}`);
-  if (cached) return cached;
-
-  try {
-    const result = await pool.query(`
-      (
-        SELECT 'lead' AS type, l.full_name AS name, o.name AS org_name, l.created_at
-        FROM leads l JOIN organizations o ON o.id = l.organization_id
-        ORDER BY l.created_at DESC LIMIT $1
-      )
-      UNION ALL
-      (
-        SELECT 'deal' AS type, d.deal_name AS name, o.name AS org_name, d.created_at
-        FROM deals d JOIN organizations o ON o.id = d.organization_id
-        ORDER BY d.created_at DESC LIMIT $1
-      )
-      UNION ALL
-      (
-        SELECT 'client' AS type, COALESCE(c.display_name, 'Unnamed Client') AS name, o.name AS org_name, c.created_at
-        FROM clients c JOIN organizations o ON o.id = c.organization_id
-        ORDER BY c.created_at DESC LIMIT $1
-      )
-      ORDER BY created_at DESC
-      LIMIT $1
-    `, [limit]);
-
-    const activity: CrmActivity[] = result.rows.map(row => ({
-      type: row.type as 'lead' | 'deal' | 'client',
-      name: row.name || 'Unnamed',
-      orgName: row.org_name,
       createdAt: row.created_at?.toISOString?.() || String(row.created_at),
     }));
 
-    setCache(`activity_${limit}`, activity);
-    return activity;
+    setCache('tenantOverview', tenants);
+    return tenants;
   } catch (err) {
-    console.error('CRM DB getRecentActivity failed:', err);
+    console.error('CRM DB getTenantOverview failed:', err);
     throw err;
   }
 }
 
-export async function getLeadsByStatus(): Promise<CrmStatusBreakdown[]> {
-  const cached = getCached<CrmStatusBreakdown[]>('leadsByStatus');
+export async function getUsersByTenant(orgId?: string): Promise<CrmUser[]> {
+  const cacheKey = `users_${orgId || 'all'}`;
+  const cached = getCached<CrmUser[]>(cacheKey);
   if (cached) return cached;
 
   try {
-    const result = await pool.query(`
-      SELECT COALESCE(lead_status, 'unknown') AS status, COUNT(*)::int AS count
-      FROM leads
-      GROUP BY lead_status
-      ORDER BY count DESC
-    `);
+    const params: string[] = [];
+    let whereClause = '';
+    if (orgId) {
+      params.push(orgId);
+      whereClause = 'WHERE u.organization_id = $1';
+    }
 
-    const breakdown: CrmStatusBreakdown[] = result.rows.map(row => ({
-      status: row.status,
-      count: row.count,
+    const result = await pool.query(`
+      SELECT
+        u.id,
+        u.first_name,
+        u.last_name,
+        u.email,
+        u.role,
+        u.organization_id,
+        COALESCE(o.name, 'Unknown') AS org_name,
+        u.last_login_at,
+        COALESCE(u.login_count, 0)::int AS login_count,
+        u.created_at
+      FROM users u
+      LEFT JOIN organizations o ON o.id = u.organization_id
+      ${whereClause}
+      ORDER BY u.last_login_at DESC NULLS LAST, u.created_at DESC
+    `, params);
+
+    const users: CrmUser[] = result.rows.map(row => ({
+      id: row.id,
+      firstName: row.first_name || '',
+      lastName: row.last_name || '',
+      email: row.email,
+      role: row.role || 'user',
+      organizationId: row.organization_id,
+      orgName: row.org_name,
+      lastLoginAt: row.last_login_at?.toISOString?.() || null,
+      loginCount: row.login_count,
+      createdAt: row.created_at?.toISOString?.() || String(row.created_at),
     }));
 
-    setCache('leadsByStatus', breakdown);
-    return breakdown;
+    setCache(cacheKey, users);
+    return users;
   } catch (err) {
-    console.error('CRM DB getLeadsByStatus failed:', err);
+    console.error('CRM DB getUsersByTenant failed:', err);
     throw err;
   }
 }
 
-export async function getDealsByStage(): Promise<CrmStatusBreakdown[]> {
-  const cached = getCached<CrmStatusBreakdown[]>('dealsByStage');
+export async function getLoginEvents(filters?: {
+  orgId?: string;
+  userId?: string;
+  eventType?: string;
+  limit?: number;
+}): Promise<CrmLoginEvent[]> {
+  const limit = filters?.limit || 50;
+  const conditions: string[] = [];
+  const params: (string | number)[] = [];
+  let paramIdx = 1;
+
+  if (filters?.orgId) {
+    conditions.push(`e.organization_id = $${paramIdx++}`);
+    params.push(filters.orgId);
+  }
+  if (filters?.userId) {
+    conditions.push(`e.user_id = $${paramIdx++}`);
+    params.push(filters.userId);
+  }
+  if (filters?.eventType) {
+    conditions.push(`e.event_type = $${paramIdx++}`);
+    params.push(filters.eventType);
+  }
+
+  const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+  params.push(limit);
+
+  try {
+    const result = await pool.query(`
+      SELECT
+        e.id,
+        e.email,
+        COALESCE(o.name, 'Unknown') AS org_name,
+        e.event_type,
+        e.ip_address,
+        e.user_agent,
+        e.created_at
+      FROM user_login_events e
+      LEFT JOIN organizations o ON o.id = e.organization_id
+      ${whereClause}
+      ORDER BY e.created_at DESC
+      LIMIT $${paramIdx}
+    `, params);
+
+    return result.rows.map(row => ({
+      id: row.id,
+      email: row.email,
+      orgName: row.org_name,
+      eventType: row.event_type,
+      ipAddress: row.ip_address,
+      userAgent: row.user_agent,
+      createdAt: row.created_at?.toISOString?.() || String(row.created_at),
+    }));
+  } catch (err) {
+    console.error('CRM DB getLoginEvents failed:', err);
+    throw err;
+  }
+}
+
+export async function getLoginStats(): Promise<CrmLoginStats> {
+  const cached = getCached<CrmLoginStats>('loginStats');
   if (cached) return cached;
 
   try {
     const result = await pool.query(`
-      SELECT COALESCE(stage, 'unknown') AS status, COUNT(*)::int AS count
-      FROM deals
-      GROUP BY stage
-      ORDER BY count DESC
+      SELECT
+        (SELECT COUNT(*) FROM user_login_events WHERE event_type = 'login')::int AS total_logins,
+        (SELECT COUNT(DISTINCT user_id) FROM user_login_events WHERE event_type = 'login')::int AS unique_users,
+        (SELECT COUNT(*) FROM user_login_events WHERE event_type = 'login' AND created_at >= CURRENT_DATE)::int AS logins_today,
+        (SELECT COUNT(*) FROM user_login_events WHERE event_type = 'login' AND created_at >= DATE_TRUNC('week', CURRENT_DATE))::int AS logins_this_week,
+        (SELECT COUNT(*) FROM user_login_events WHERE event_type = 'login' AND created_at >= DATE_TRUNC('month', CURRENT_DATE))::int AS logins_this_month
     `);
 
-    const breakdown: CrmStatusBreakdown[] = result.rows.map(row => ({
-      status: row.status,
-      count: row.count,
-    }));
+    const row = result.rows[0];
+    const stats: CrmLoginStats = {
+      totalLogins: row.total_logins,
+      uniqueUsers: row.unique_users,
+      loginsToday: row.logins_today,
+      loginsThisWeek: row.logins_this_week,
+      loginsThisMonth: row.logins_this_month,
+    };
 
-    setCache('dealsByStage', breakdown);
-    return breakdown;
+    setCache('loginStats', stats);
+    return stats;
   } catch (err) {
-    console.error('CRM DB getDealsByStage failed:', err);
+    console.error('CRM DB getLoginStats failed:', err);
     throw err;
   }
 }

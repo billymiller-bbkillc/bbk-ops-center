@@ -1,11 +1,11 @@
 import { Router } from 'express';
 import { getCrmHealth } from '../lib/salespipe';
 import {
-  getGlobalStats,
-  getOrganizations,
-  getRecentActivity,
-  getLeadsByStatus,
-  getDealsByStage,
+  getQuickStats,
+  getTenantOverview,
+  getUsersByTenant,
+  getLoginEvents,
+  getLoginStats,
 } from '../lib/crm-db';
 
 const router = Router();
@@ -16,59 +16,64 @@ router.get('/health', (_req, res) => {
   res.json({ success: true, data: health });
 });
 
-// Global stats from DB (cross-tenant)
+// Quick stats (tenant count, user count, active tenants)
 router.get('/stats', async (_req, res) => {
   try {
-    const stats = await getGlobalStats();
+    const stats = await getQuickStats();
     res.json({ success: true, data: stats });
   } catch (err) {
     console.error('CRM stats error:', err);
-    res.json({ success: false, error: 'Failed to fetch global stats' });
+    res.json({ success: false, error: 'Failed to fetch quick stats' });
   }
 });
 
-// All organizations with their stats
-router.get('/organizations', async (_req, res) => {
+// Tenant directory with user counts
+router.get('/tenants', async (_req, res) => {
   try {
-    const orgs = await getOrganizations();
-    res.json({ success: true, data: orgs });
+    const tenants = await getTenantOverview();
+    res.json({ success: true, data: tenants });
   } catch (err) {
-    console.error('CRM organizations error:', err);
-    res.json({ success: false, error: 'Failed to fetch organizations' });
+    console.error('CRM tenants error:', err);
+    res.json({ success: false, error: 'Failed to fetch tenants' });
   }
 });
 
-// Recent activity feed across all tenants
-router.get('/activity', async (_req, res) => {
+// All users with org info and login data
+router.get('/users', async (_req, res) => {
   try {
-    const limit = parseInt(String(_req.query.limit)) || 20;
-    const activity = await getRecentActivity(limit);
-    res.json({ success: true, data: activity });
+    const orgId = _req.query.orgId as string | undefined;
+    const users = await getUsersByTenant(orgId);
+    res.json({ success: true, data: users });
   } catch (err) {
-    console.error('CRM activity error:', err);
-    res.json({ success: false, error: 'Failed to fetch activity' });
+    console.error('CRM users error:', err);
+    res.json({ success: false, error: 'Failed to fetch users' });
   }
 });
 
-// Lead status breakdown
-router.get('/leads/by-status', async (_req, res) => {
+// Login event history
+router.get('/logins', async (_req, res) => {
   try {
-    const breakdown = await getLeadsByStatus();
-    res.json({ success: true, data: breakdown });
+    const events = await getLoginEvents({
+      orgId: _req.query.orgId as string | undefined,
+      userId: _req.query.userId as string | undefined,
+      eventType: _req.query.eventType as string | undefined,
+      limit: _req.query.limit ? parseInt(String(_req.query.limit)) : undefined,
+    });
+    res.json({ success: true, data: events });
   } catch (err) {
-    console.error('CRM leads breakdown error:', err);
-    res.json({ success: false, error: 'Failed to fetch leads breakdown' });
+    console.error('CRM logins error:', err);
+    res.json({ success: false, error: 'Failed to fetch login events' });
   }
 });
 
-// Deal stage breakdown
-router.get('/deals/by-stage', async (_req, res) => {
+// Login aggregate stats
+router.get('/logins/stats', async (_req, res) => {
   try {
-    const breakdown = await getDealsByStage();
-    res.json({ success: true, data: breakdown });
+    const stats = await getLoginStats();
+    res.json({ success: true, data: stats });
   } catch (err) {
-    console.error('CRM deals breakdown error:', err);
-    res.json({ success: false, error: 'Failed to fetch deals breakdown' });
+    console.error('CRM login stats error:', err);
+    res.json({ success: false, error: 'Failed to fetch login stats' });
   }
 });
 

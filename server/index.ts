@@ -9,6 +9,7 @@ import healthRoutes from './routes/health';
 import sseRoutes, { pollAndBroadcast } from './routes/sse';
 import crmRoutes from './routes/crm';
 import n8nRoutes from './routes/n8n';
+import githubTaskRoutes from './routes/github-tasks';
 import { startCrmPolling } from './lib/salespipe';
 import { startN8nPolling } from './lib/n8n';
 
@@ -30,6 +31,7 @@ app.use('/api/health', healthRoutes);
 app.use('/api/sse', sseRoutes);
 app.use('/api/crm', crmRoutes);
 app.use('/api/n8n', n8nRoutes);
+app.use('/api/github-tasks', githubTaskRoutes);
 
 // Health check
 app.get('/api/status', (_req, res) => {

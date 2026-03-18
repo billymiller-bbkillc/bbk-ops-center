@@ -1,62 +1,35 @@
-import React from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import React, { useState, useMemo } from 'react';
 import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
+import { StatCard } from '@/components/ui/stat-card';
+import { ChartCard } from '@/components/ui/chart-card';
 import { useApi } from '@/hooks/useApi';
-import { formatUptime } from '@/lib/utils';
 import type {
-  CrmHealth,
-  CrmGlobalStats,
-  CrmOrganization,
-  CrmActivity,
-  CrmStatusBreakdown,
+  CrmQuickStats,
+  CrmTenant,
+  CrmUser,
+  CrmLoginEvent,
 } from '@shared/types';
 import {
-  Activity,
-  Users,
-  Handshake,
   Building2,
-  Target,
+  Users,
+  Activity,
+  ChevronUp,
+  ChevronDown,
+  Shield,
   Clock,
-  Zap,
+  LogIn,
+  LogOut,
   AlertTriangle,
-  MemoryStick,
-  Globe,
-  UserCheck,
-  TrendingUp,
-  BarChart3,
-  CreditCard,
+  X,
 } from 'lucide-react';
 
 // ===== Helpers =====
 
-function getHealthVariant(status: string): 'success' | 'warning' | 'error' {
-  if (status === 'ok' || status === 'healthy') return 'success';
-  if (status === 'degraded' || status === 'warning') return 'warning';
-  return 'error';
-}
-
-function getHealthLabel(status: string): string {
-  if (status === 'ok' || status === 'healthy') return 'Healthy';
-  if (status === 'unreachable') return 'Unreachable';
-  return status;
-}
-
-function formatMemoryMb(bytes: number): string {
-  const mb = bytes / (1024 * 1024);
-  if (mb >= 1024) return `${(mb / 1024).toFixed(1)} GB`;
-  return `${mb.toFixed(0)} MB`;
-}
-
-function formatMs(ms: number): string {
-  if (ms < 1) return `${(ms * 1000).toFixed(0)}µs`;
-  if (ms < 1000) return `${ms.toFixed(1)}ms`;
-  return `${(ms / 1000).toFixed(2)}s`;
-}
-
-function timeAgo(dateStr: string): string {
+function timeAgo(dateStr: string | null): string {
+  if (!dateStr) return 'Never';
   const now = Date.now();
   const then = new Date(dateStr).getTime();
+  if (isNaN(then)) return 'Never';
   const diff = now - then;
   const mins = Math.floor(diff / 60000);
   if (mins < 1) return 'just now';
@@ -64,365 +37,353 @@ function timeAgo(dateStr: string): string {
   const hrs = Math.floor(mins / 60);
   if (hrs < 24) return `${hrs}h ago`;
   const days = Math.floor(hrs / 24);
-  return `${days}d ago`;
+  if (days < 30) return `${days}d ago`;
+  const months = Math.floor(days / 30);
+  return `${months}mo ago`;
 }
 
-function getActivityIcon(type: string) {
-  switch (type) {
-    case 'lead': return <Target className="w-3 h-3 text-blue-400" />;
-    case 'deal': return <Handshake className="w-3 h-3 text-green-400" />;
-    case 'client': return <Users className="w-3 h-3 text-purple-400" />;
-    default: return <Activity className="w-3 h-3" />;
+function formatDate(dateStr: string): string {
+  try {
+    return new Date(dateStr).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    });
+  } catch {
+    return dateStr;
   }
+}
+
+function getPlanBadgeColor(plan: string): 'success' | 'warning' | 'error' | 'secondary' {
+  const p = plan?.toLowerCase();
+  if (p === 'enterprise' || p === 'pro') return 'success';
+  if (p === 'starter' || p === 'basic') return 'warning';
+  return 'secondary';
 }
 
 function getStatusColor(status: string): string {
   const s = status?.toLowerCase();
-  if (s === 'active' || s === 'paid' || s === 'won' || s === 'converted' || s === 'qualified') return 'text-green-400';
-  if (s === 'inactive' || s === 'lost' || s === 'cold') return 'text-red-400';
-  if (s === 'pending' || s === 'warm' || s === 'contacted' || s === 'negotiation' || s === 'proposal') return 'text-yellow-400';
-  if (s === 'new') return 'text-blue-400';
+  if (s === 'active') return 'text-emerald-400';
+  if (s === 'inactive' || s === 'suspended') return 'text-red-400';
+  if (s === 'pending' || s === 'trial') return 'text-amber-400';
   return 'text-muted-foreground';
 }
 
-function getPaymentBadge(status: string): 'success' | 'warning' | 'error' | 'secondary' {
-  const s = status?.toLowerCase();
-  if (s === 'paid' || s === 'active') return 'success';
-  if (s === 'pending' || s === 'trialing') return 'warning';
-  if (s === 'failed' || s === 'overdue') return 'error';
+function getRoleBadge(role: string): 'success' | 'warning' | 'secondary' {
+  const r = role?.toLowerCase();
+  if (r === 'admin' || r === 'owner') return 'success';
+  if (r === 'manager') return 'warning';
   return 'secondary';
 }
 
-// ===== Stat Card =====
+function getEventIcon(eventType: string) {
+  switch (eventType) {
+    case 'login':
+      return <LogIn className="w-3.5 h-3.5 text-emerald-400" />;
+    case 'logout':
+      return <LogOut className="w-3.5 h-3.5 text-blue-400" />;
+    case 'login_failed':
+      return <AlertTriangle className="w-3.5 h-3.5 text-red-400" />;
+    default:
+      return <Activity className="w-3.5 h-3.5 text-muted-foreground" />;
+  }
+}
 
-function StatCard({ icon: Icon, label, value, color }: {
-  icon: React.ElementType;
+function getEventBadgeVariant(eventType: string): 'success' | 'warning' | 'error' | 'secondary' {
+  switch (eventType) {
+    case 'login': return 'success';
+    case 'logout': return 'secondary';
+    case 'login_failed': return 'error';
+    default: return 'secondary';
+  }
+}
+
+// ===== Sorting =====
+
+type SortDir = 'asc' | 'desc';
+
+function SortHeader({ label, active, dir, onClick }: {
   label: string;
-  value: number | string;
-  color: string;
+  active: boolean;
+  dir: SortDir;
+  onClick: () => void;
 }) {
   return (
-    <Card>
-      <CardContent className="pt-4 pb-4">
-        <div className="flex items-center gap-3">
-          <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${color}`}>
-            <Icon className="w-5 h-5 text-white" />
-          </div>
-          <div>
-            <p className="text-2xl font-bold font-mono-nums">{value}</p>
-            <p className="text-xs text-muted-foreground">{label}</p>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
+    <th
+      className="py-2.5 pr-4 font-medium cursor-pointer select-none hover:text-foreground transition-colors text-left"
+      onClick={onClick}
+    >
+      <span className="inline-flex items-center gap-1">
+        {label}
+        {active && (dir === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
+      </span>
+    </th>
   );
 }
 
-// ===== Breakdown Card =====
+function useSortable<T>(data: T[] | null, defaultKey: keyof T, defaultDir: SortDir = 'desc') {
+  const [sortKey, setSortKey] = useState<keyof T>(defaultKey);
+  const [sortDir, setSortDir] = useState<SortDir>(defaultDir);
 
-function BreakdownCard({ title, icon: Icon, data, colorFn }: {
-  title: string;
-  icon: React.ElementType;
-  data: CrmStatusBreakdown[] | null;
-  colorFn: (s: string) => string;
-}) {
-  const total = data?.reduce((sum, d) => sum + d.count, 0) || 0;
+  const toggle = (key: keyof T) => {
+    if (sortKey === key) {
+      setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortKey(key);
+      setSortDir('desc');
+    }
+  };
 
-  return (
-    <Card className="h-full">
-      <CardHeader className="pb-2">
-        <CardTitle className="text-sm flex items-center gap-2">
-          <Icon className="w-4 h-4" />
-          {title}
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        {data && data.length > 0 ? (
-          <div className="space-y-2">
-            {data.map(item => {
-              const pct = total > 0 ? (item.count / total) * 100 : 0;
-              return (
-                <div key={item.status} className="space-y-1">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className={`capitalize font-medium ${colorFn(item.status)}`}>
-                      {item.status}
-                    </span>
-                    <span className="font-mono-nums text-muted-foreground">
-                      {item.count} ({pct.toFixed(0)}%)
-                    </span>
-                  </div>
-                  <div className="h-1.5 bg-accent rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-primary/60 rounded-full transition-all"
-                      style={{ width: `${pct}%` }}
-                    />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        ) : (
-          <p className="text-xs text-muted-foreground">No data available</p>
-        )}
-      </CardContent>
-    </Card>
-  );
+  const sorted = useMemo(() => {
+    if (!data) return [];
+    return [...data].sort((a, b) => {
+      const aVal = a[sortKey];
+      const bVal = b[sortKey];
+      if (aVal == null && bVal == null) return 0;
+      if (aVal == null) return 1;
+      if (bVal == null) return -1;
+      const cmp = typeof aVal === 'number' && typeof bVal === 'number'
+        ? aVal - bVal
+        : String(aVal).localeCompare(String(bVal));
+      return sortDir === 'asc' ? cmp : -cmp;
+    });
+  }, [data, sortKey, sortDir]);
+
+  return { sorted, sortKey, sortDir, toggle };
 }
 
 // ===== Main Panel =====
 
 export function CrmPanel() {
-  const { data: health } = useApi<CrmHealth>('/api/crm/health');
-  const { data: stats } = useApi<CrmGlobalStats>('/api/crm/stats');
-  const { data: orgs } = useApi<CrmOrganization[]>('/api/crm/organizations');
-  const { data: activity } = useApi<CrmActivity[]>('/api/crm/activity');
-  const { data: leadBreakdown } = useApi<CrmStatusBreakdown[]>('/api/crm/leads/by-status');
-  const { data: dealBreakdown } = useApi<CrmStatusBreakdown[]>('/api/crm/deals/by-stage');
+  const { data: stats } = useApi<CrmQuickStats>('/api/crm/stats');
+  const { data: tenants } = useApi<CrmTenant[]>('/api/crm/tenants');
+  const { data: allUsers } = useApi<CrmUser[]>('/api/crm/users');
+  const { data: loginEvents } = useApi<CrmLoginEvent[]>('/api/crm/logins');
 
-  const memPct = health && health.memory.total > 0
-    ? (health.memory.used / health.memory.total) * 100
-    : 0;
+  const [selectedTenantId, setSelectedTenantId] = useState<string | null>(null);
+
+  const selectedTenant = tenants?.find(t => t.id === selectedTenantId);
+
+  const filteredUsers = useMemo(() => {
+    if (!allUsers) return null;
+    if (!selectedTenantId) return allUsers;
+    return allUsers.filter(u => u.organizationId === selectedTenantId);
+  }, [allUsers, selectedTenantId]);
+
+  const tenantSort = useSortable(tenants, 'userCount' as keyof CrmTenant, 'desc');
+  const userSort = useSortable(filteredUsers, 'lastLoginAt' as keyof CrmUser, 'desc');
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-lg font-semibold">SalesPipe CRM — Super Admin</h2>
-          <p className="text-sm text-muted-foreground">Cross-tenant overview • Direct database connection</p>
+          <p className="text-sm text-muted-foreground">Tenant directory • User tracking • Login activity</p>
         </div>
-        <div className="flex items-center gap-2">
-          {stats && (
-            <Badge variant="secondary" className="text-[10px]">
-              Updated {new Date(stats.lastChecked).toLocaleTimeString()}
-            </Badge>
-          )}
-          {health && (
-            <Badge variant={getHealthVariant(health.status)}>
-              {getHealthLabel(health.status)}
-            </Badge>
-          )}
-        </div>
+        {stats && (
+          <Badge variant="secondary" className="text-[10px]">
+            Updated {new Date(stats.lastChecked).toLocaleTimeString()}
+          </Badge>
+        )}
       </div>
 
-      {/* Row 1 — Global Stats Cards */}
-      <div className="grid grid-cols-6 gap-3">
-        <StatCard icon={Globe} label="Organizations" value={stats?.totalOrganizations ?? '—'} color="bg-indigo-500" />
-        <StatCard icon={UserCheck} label="Users" value={stats?.totalUsers ?? '—'} color="bg-cyan-500" />
-        <StatCard icon={Target} label="Leads" value={stats?.totalLeads ?? '—'} color="bg-blue-500" />
-        <StatCard icon={Handshake} label="Deals" value={stats?.totalDeals ?? '—'} color="bg-green-500" />
-        <StatCard icon={Users} label="Clients" value={stats?.totalClients ?? '—'} color="bg-purple-500" />
-        <StatCard icon={Building2} label="Companies" value={stats?.totalCompanies ?? '—'} color="bg-orange-500" />
+      {/* Row 1 — Stat Cards */}
+      <div className="grid grid-cols-3 gap-6">
+        <StatCard
+          icon={Building2}
+          value={stats?.totalTenants ?? '—'}
+          label="Total Tenants"
+          subtitle="All organizations"
+          accentColor="blue"
+        />
+        <StatCard
+          icon={Users}
+          value={stats?.totalUsers ?? '—'}
+          label="Total Users"
+          subtitle="Across all tenants"
+          accentColor="green"
+        />
+        <StatCard
+          icon={Shield}
+          value={stats?.activeTenants ?? 'N/A'}
+          label="Active Tenants"
+          subtitle="Logged in last 30 days"
+          accentColor="amber"
+        />
       </div>
 
-      {/* Row 2 — Health + Performance */}
-      <div className="grid grid-cols-2 gap-4">
-        {/* Health Card */}
-        <Card className="relative overflow-hidden">
-          <div className={`absolute top-0 left-0 right-0 h-0.5 ${
-            health?.status === 'ok' || health?.status === 'healthy' ? 'bg-status-healthy' :
-            health?.status === 'unreachable' ? 'bg-status-critical' : 'bg-status-warning'
-          }`} />
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm flex items-center gap-2">
-              <Activity className="w-4 h-4" />
-              CRM Application Health
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex items-center justify-between text-xs">
-              <span className="text-muted-foreground flex items-center gap-1">
-                <Clock className="w-3 h-3" /> Uptime
-              </span>
-              <span className="font-mono-nums">{health ? formatUptime(health.uptime) : '—'}</span>
-            </div>
-            <div className="space-y-1">
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-muted-foreground flex items-center gap-1">
-                  <MemoryStick className="w-3 h-3" /> Memory
-                </span>
-                <span className="font-mono-nums">
-                  {health ? `${formatMemoryMb(health.memory.used)} / ${formatMemoryMb(health.memory.total)}` : '—'}
-                </span>
-              </div>
-              <Progress value={memPct} indicatorClassName={
-                memPct > 90 ? 'bg-status-critical' : memPct > 70 ? 'bg-status-warning' : 'bg-status-healthy'
-              } />
-            </div>
-            <div className="flex items-center justify-between text-xs">
-              <span className="text-muted-foreground">RSS</span>
-              <span className="font-mono-nums">{health ? formatMemoryMb(health.memory.rss) : '—'}</span>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Performance Card */}
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm flex items-center gap-2">
-              <Zap className="w-4 h-4" />
-              Performance
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="text-center">
-              <p className="text-3xl font-bold font-mono-nums">
-                {health ? formatMs(health.performance.averageResponseTime) : '—'}
-              </p>
-              <p className="text-[10px] text-muted-foreground">Avg Response Time</p>
-            </div>
-            <div className="grid grid-cols-2 gap-2 text-center">
-              <div>
-                <p className="text-lg font-bold font-mono-nums">
-                  {health ? health.performance.totalRequests.toLocaleString() : '—'}
-                </p>
-                <p className="text-[10px] text-muted-foreground">Total Requests</p>
-              </div>
-              <div>
-                <p className="text-lg font-bold font-mono-nums text-status-critical">
-                  {health ? health.performance.errorCount : '—'}
-                </p>
-                <p className="text-[10px] text-muted-foreground">Errors</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Row 3 — Tenant Directory Table */}
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm flex items-center gap-2">
-            <Globe className="w-4 h-4" />
-            Tenant Directory
-          </CardTitle>
-          <CardDescription className="text-[10px]">
-            All organizations sorted by activity
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {orgs && orgs.length > 0 ? (
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs">
-                <thead>
-                  <tr className="border-b border-border text-muted-foreground">
-                    <th className="text-left py-2 pr-4 font-medium">Organization</th>
-                    <th className="text-left py-2 pr-4 font-medium">Plan</th>
-                    <th className="text-left py-2 pr-4 font-medium">Status</th>
-                    <th className="text-left py-2 pr-4 font-medium">Payment</th>
-                    <th className="text-right py-2 pr-4 font-medium">Users</th>
-                    <th className="text-right py-2 pr-4 font-medium">Leads</th>
-                    <th className="text-right py-2 pr-4 font-medium">Deals</th>
-                    <th className="text-right py-2 font-medium">Clients</th>
+      {/* Row 2 — Tenant Directory */}
+      <ChartCard
+        title="Tenant Directory"
+        subtitle={`${tenants?.length ?? 0} organizations${selectedTenantId ? ' • Click ✕ to clear filter' : ''}`}
+        action={selectedTenantId && (
+          <button
+            onClick={() => setSelectedTenantId(null)}
+            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors px-2 py-1 rounded-md hover:bg-accent"
+          >
+            <X className="w-3 h-3" />
+            Clear filter: {selectedTenant?.name}
+          </button>
+        )}
+      >
+        {tenants && tenants.length > 0 ? (
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b border-border text-muted-foreground">
+                  <SortHeader label="Tenant Name" active={tenantSort.sortKey === 'name'} dir={tenantSort.sortDir} onClick={() => tenantSort.toggle('name')} />
+                  <SortHeader label="Plan" active={tenantSort.sortKey === 'planType'} dir={tenantSort.sortDir} onClick={() => tenantSort.toggle('planType')} />
+                  <SortHeader label="Status" active={tenantSort.sortKey === 'status'} dir={tenantSort.sortDir} onClick={() => tenantSort.toggle('status')} />
+                  <SortHeader label="Users" active={tenantSort.sortKey === 'userCount'} dir={tenantSort.sortDir} onClick={() => tenantSort.toggle('userCount')} />
+                  <SortHeader label="Created" active={tenantSort.sortKey === 'createdAt'} dir={tenantSort.sortDir} onClick={() => tenantSort.toggle('createdAt')} />
+                </tr>
+              </thead>
+              <tbody>
+                {tenantSort.sorted.map((tenant, idx) => (
+                  <tr
+                    key={tenant.id}
+                    onClick={() => setSelectedTenantId(tenant.id === selectedTenantId ? null : tenant.id)}
+                    className={`border-b border-border/30 cursor-pointer transition-colors ${
+                      tenant.id === selectedTenantId
+                        ? 'bg-blue-500/10 hover:bg-blue-500/15'
+                        : idx % 2 === 0
+                          ? 'hover:bg-accent/30'
+                          : 'bg-accent/5 hover:bg-accent/30'
+                    }`}
+                  >
+                    <td className="py-2.5 pr-4 font-medium">{tenant.name}</td>
+                    <td className="py-2.5 pr-4">
+                      <Badge variant={getPlanBadgeColor(tenant.subscriptionTier)} className="text-[10px] capitalize">
+                        {tenant.subscriptionTier}
+                      </Badge>
+                    </td>
+                    <td className="py-2.5 pr-4">
+                      <span className={`capitalize font-medium ${getStatusColor(tenant.status)}`}>
+                        {tenant.status}
+                      </span>
+                    </td>
+                    <td className="py-2.5 pr-4 font-mono-nums">{tenant.userCount}</td>
+                    <td className="py-2.5 pr-4 text-muted-foreground">{formatDate(tenant.createdAt)}</td>
                   </tr>
-                </thead>
-                <tbody>
-                  {orgs.map(org => (
-                    <tr key={org.id} className="border-b border-border/50 hover:bg-accent/30 transition-colors">
-                      <td className="py-2 pr-4">
-                        <div className="font-medium">{org.name}</div>
-                        <div className="text-[10px] text-muted-foreground">
-                          {org.seats} seat{org.seats !== 1 ? 's' : ''}
-                        </div>
-                      </td>
-                      <td className="py-2 pr-4">
-                        <Badge variant="secondary" className="text-[10px] capitalize">
-                          {org.subscriptionTier}
-                        </Badge>
-                      </td>
-                      <td className="py-2 pr-4">
-                        <span className={`capitalize ${getStatusColor(org.status)}`}>
-                          {org.status}
-                        </span>
-                      </td>
-                      <td className="py-2 pr-4">
-                        <Badge variant={getPaymentBadge(org.paymentStatus)} className="text-[10px] capitalize">
-                          {org.paymentStatus}
-                        </Badge>
-                      </td>
-                      <td className="py-2 pr-4 text-right font-mono-nums">{org.userCount}</td>
-                      <td className="py-2 pr-4 text-right font-mono-nums">{org.leadCount}</td>
-                      <td className="py-2 pr-4 text-right font-mono-nums">{org.dealCount}</td>
-                      <td className="py-2 text-right font-mono-nums">{org.clientCount}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <p className="text-xs text-muted-foreground">Loading organizations...</p>
-          )}
-        </CardContent>
-      </Card>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p className="text-xs text-muted-foreground py-4 text-center">Loading tenants...</p>
+        )}
+      </ChartCard>
 
-      {/* Row 4 — Activity Feed + Breakdowns */}
-      <div className="grid grid-cols-3 gap-4">
-        {/* Activity Feed */}
-        <Card className="h-full">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm flex items-center gap-2">
-              <TrendingUp className="w-4 h-4" />
-              Recent Activity
-            </CardTitle>
-            <CardDescription className="text-[10px]">
-              Cross-tenant feed
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {activity && activity.length > 0 ? (
-              <div className="space-y-2 max-h-[320px] overflow-y-auto pr-1">
-                {activity.map((item, idx) => (
-                  <div key={idx} className="flex items-start gap-2 py-1 border-b border-border/30 last:border-0">
-                    <div className="mt-0.5">{getActivityIcon(item.type)}</div>
+      {/* Row 3 — Users + Login Activity side by side */}
+      <div className="grid grid-cols-5 gap-6">
+        {/* Users Table — 3/5 */}
+        <div className="col-span-3">
+          <ChartCard
+            title={selectedTenant ? `Users — ${selectedTenant.name}` : 'All Users'}
+            subtitle={`${filteredUsers?.length ?? 0} users`}
+          >
+            {filteredUsers && filteredUsers.length > 0 ? (
+              <div className="overflow-x-auto max-h-[400px] overflow-y-auto">
+                <table className="w-full text-xs">
+                  <thead className="sticky top-0 bg-card z-10">
+                    <tr className="border-b border-border text-muted-foreground">
+                      <SortHeader label="Name" active={userSort.sortKey === 'lastName'} dir={userSort.sortDir} onClick={() => userSort.toggle('lastName')} />
+                      <SortHeader label="Email" active={userSort.sortKey === 'email'} dir={userSort.sortDir} onClick={() => userSort.toggle('email')} />
+                      <SortHeader label="Role" active={userSort.sortKey === 'role'} dir={userSort.sortDir} onClick={() => userSort.toggle('role')} />
+                      {!selectedTenantId && (
+                        <SortHeader label="Tenant" active={userSort.sortKey === 'orgName'} dir={userSort.sortDir} onClick={() => userSort.toggle('orgName')} />
+                      )}
+                      <SortHeader label="Last Login" active={userSort.sortKey === 'lastLoginAt'} dir={userSort.sortDir} onClick={() => userSort.toggle('lastLoginAt')} />
+                      <SortHeader label="Logins" active={userSort.sortKey === 'loginCount'} dir={userSort.sortDir} onClick={() => userSort.toggle('loginCount')} />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {userSort.sorted.map((user, idx) => (
+                      <tr
+                        key={user.id}
+                        className={`border-b border-border/30 transition-colors ${
+                          idx % 2 === 0 ? 'hover:bg-accent/30' : 'bg-accent/5 hover:bg-accent/30'
+                        }`}
+                      >
+                        <td className="py-2 pr-4 font-medium whitespace-nowrap">
+                          {user.firstName} {user.lastName}
+                        </td>
+                        <td className="py-2 pr-4 text-muted-foreground truncate max-w-[180px]">{user.email}</td>
+                        <td className="py-2 pr-4">
+                          <Badge variant={getRoleBadge(user.role)} className="text-[10px] capitalize">
+                            {user.role}
+                          </Badge>
+                        </td>
+                        {!selectedTenantId && (
+                          <td className="py-2 pr-4 text-muted-foreground truncate max-w-[140px]">{user.orgName}</td>
+                        )}
+                        <td className="py-2 pr-4 text-muted-foreground whitespace-nowrap">
+                          <span className="inline-flex items-center gap-1">
+                            <Clock className="w-3 h-3" />
+                            {timeAgo(user.lastLoginAt)}
+                          </span>
+                        </td>
+                        <td className="py-2 pr-4 font-mono-nums text-center">{user.loginCount}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : filteredUsers && filteredUsers.length === 0 ? (
+              <p className="text-xs text-muted-foreground py-4 text-center">No users found</p>
+            ) : (
+              <p className="text-xs text-muted-foreground py-4 text-center">Loading users...</p>
+            )}
+          </ChartCard>
+        </div>
+
+        {/* Login Activity — 2/5 */}
+        <div className="col-span-2">
+          <ChartCard
+            title="Login Activity"
+            subtitle="Recent login events"
+          >
+            {loginEvents && loginEvents.length > 0 ? (
+              <div className="space-y-1.5 max-h-[400px] overflow-y-auto pr-1">
+                {loginEvents.map(event => (
+                  <div
+                    key={event.id}
+                    className="flex items-start gap-2.5 py-2 px-2 rounded-lg hover:bg-accent/30 transition-colors border-b border-border/20 last:border-0"
+                  >
+                    <div className="mt-0.5">{getEventIcon(event.eventType)}</div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-xs font-medium truncate">{item.name}</p>
-                      <p className="text-[10px] text-muted-foreground truncate">
-                        {item.orgName} • {timeAgo(item.createdAt)}
-                      </p>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-medium truncate">{event.email}</span>
+                        <Badge variant={getEventBadgeVariant(event.eventType)} className="text-[9px] capitalize flex-shrink-0">
+                          {event.eventType.replace('_', ' ')}
+                        </Badge>
+                      </div>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <span className="text-[10px] text-muted-foreground truncate">{event.orgName}</span>
+                        {event.ipAddress && (
+                          <span className="text-[10px] text-muted-foreground font-mono-nums">
+                            {event.ipAddress}
+                          </span>
+                        )}
+                      </div>
+                      <span className="text-[10px] text-muted-foreground">{timeAgo(event.createdAt)}</span>
                     </div>
-                    <Badge variant="secondary" className="text-[9px] capitalize flex-shrink-0">
-                      {item.type}
-                    </Badge>
                   </div>
                 ))}
               </div>
             ) : (
-              <p className="text-xs text-muted-foreground">No recent activity</p>
+              <div className="flex flex-col items-center justify-center py-12 text-center">
+                <Activity className="w-8 h-8 text-muted-foreground/30 mb-3" />
+                <p className="text-sm font-medium text-muted-foreground">No login events yet</p>
+                <p className="text-xs text-muted-foreground/70 mt-1 max-w-[200px]">
+                  Login tracking is active. Events will appear here as users log in.
+                </p>
+              </div>
             )}
-          </CardContent>
-        </Card>
-
-        {/* Leads by Status */}
-        <BreakdownCard
-          title="Leads by Status"
-          icon={BarChart3}
-          data={leadBreakdown}
-          colorFn={getStatusColor}
-        />
-
-        {/* Deals by Stage */}
-        <BreakdownCard
-          title="Deals by Stage"
-          icon={CreditCard}
-          data={dealBreakdown}
-          colorFn={getStatusColor}
-        />
+          </ChartCard>
+        </div>
       </div>
-
-      {/* Error state */}
-      {health?.status === 'unreachable' && (
-        <Card className="border-status-critical/50">
-          <CardContent className="pt-4 pb-4 flex items-center gap-3">
-            <AlertTriangle className="w-5 h-5 text-status-critical" />
-            <div>
-              <p className="text-sm font-medium">CRM Unreachable</p>
-              <p className="text-xs text-muted-foreground">
-                Cannot connect to SalesPipe CRM. Check the API configuration and network connectivity.
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-      )}
     </div>
   );
 }

@@ -1,4 +1,20 @@
-import type { CrmHealth, CrmStats, CrmPipeline } from '../../shared/types';
+import type { CrmHealth } from '../../shared/types';
+
+// Legacy types — only used internally by the polling loop
+interface CrmStats {
+  leads: number;
+  deals: number;
+  clients: number;
+  companies: number;
+  lastChecked: string;
+}
+
+interface CrmPipeline {
+  id: string;
+  name: string;
+  isDefault: boolean;
+  stages: { id: string; name: string; orderIndex: number; dealCount?: number }[];
+}
 
 const SALESPIPE_URL = process.env.SALESPIPE_URL || 'https://www.salespipecrm.com';
 const SALESPIPE_API_KEY = process.env.SALESPIPE_API_KEY || '';
