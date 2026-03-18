@@ -15,6 +15,7 @@ import {
 } from 'recharts';
 
 const STATUS_COLORS: Record<string, string> = {
+  active: '#22c55e',
   online: '#22c55e',
   busy: '#eab308',
   idle: '#71717a',
@@ -36,7 +37,7 @@ export function Overview() {
   const { data: costSummary } = useApi<CostSummary>('/api/costs/summary?period=month');
   const { data: tasks } = useApi<Task[]>('/api/tasks');
 
-  const onlineBots = agents?.filter(a => a.status === 'online' || a.status === 'busy').length || 0;
+  const onlineBots = agents?.filter(a => a.status === 'active' || a.status === 'online' || a.status === 'busy').length || 0;
   const totalBots = agents?.length || 0;
   const errorBots = agents?.filter(a => a.status === 'error').length || 0;
 
@@ -49,9 +50,9 @@ export function Overview() {
 
   // Bot status breakdown for pie chart
   const statusCounts = {
-    online: agents?.filter(a => a.status === 'online').length || 0,
+    active: agents?.filter(a => a.status === 'active' || a.status === 'online').length || 0,
     busy: agents?.filter(a => a.status === 'busy').length || 0,
-    offline: agents?.filter(a => a.status === 'offline').length || 0,
+    idle: agents?.filter(a => a.status === 'idle' || a.status === 'offline').length || 0,
     error: agents?.filter(a => a.status === 'error').length || 0,
   };
   const pieData = Object.entries(statusCounts)

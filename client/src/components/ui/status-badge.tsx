@@ -11,6 +11,7 @@ interface StatusBadgeProps {
 }
 
 const statusConfig: Record<string, { bg: string; text: string; dot: string; pulse: boolean }> = {
+  active: { bg: 'bg-emerald-500/15', text: 'text-emerald-400', dot: 'bg-emerald-400', pulse: true },
   online: { bg: 'bg-emerald-500/15', text: 'text-emerald-400', dot: 'bg-emerald-400', pulse: true },
   healthy: { bg: 'bg-emerald-500/15', text: 'text-emerald-400', dot: 'bg-emerald-400', pulse: false },
   busy: { bg: 'bg-amber-500/15', text: 'text-amber-400', dot: 'bg-amber-400', pulse: true },

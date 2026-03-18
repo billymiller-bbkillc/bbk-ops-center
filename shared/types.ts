@@ -1,5 +1,5 @@
 // ===== Agent Fleet Types =====
-export type AgentStatus = 'online' | 'idle' | 'busy' | 'error';
+export type AgentStatus = 'active' | 'idle' | 'busy' | 'error';
 
 export interface Agent {
   id: string;

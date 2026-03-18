@@ -180,9 +180,13 @@ export async function getAgents(): Promise<Agent[]> {
     if (gatewayMatch?.active || gatewayMatch?.running) {
       status = 'busy';
     } else if (ageMs < 15 * 60 * 1000) {
-      status = 'online';
+      status = 'active';
     } else {
       status = 'idle';
+    }
+
+    if (agentName === 'bubba') {
+      console.log(`[DEBUG] Bubba status: ${status}, ageMs: ${ageMs}, lastSeen: ${new Date(lastSeenTs).toISOString()}`);
     }
 
     // Calculate uptime as time since first session
