@@ -97,6 +97,17 @@ function mapIssueToTask(issue: any, repoName: string): GitHubTask {
   }
 
   const assignees: string[] = issue.assignees?.map((a: any) => a.login?.toLowerCase()) || [];
+  
+  // Extract assignees from labels since we map bots to labels
+  for (const label of labels) {
+    if (label.toLowerCase().startsWith('assignee:')) {
+      const name = label.split(':')[1];
+      if (name && !assignees.includes(name)) {
+        assignees.push(name);
+      }
+    }
+  }
+
   const assignee = assignees[0] || null;
 
   return {
@@ -172,14 +183,25 @@ export async function createIssue(
   assignees?: string[],
   labels?: string[]
 ): Promise<GitHubTask> {
+  const finalLabels = [...(labels || [])];
+  
+  // GitHub requires actual user accounts for 'assignees'.
+  // Since bots aren't real GitHub users, we map bot assignees to special labels (e.g., "assignee:bubba")
+  // Real GitHub users (like billy) could be assigned directly if we know their exact handle,
+  // but for consistency we'll use labels for everyone in the Ops Center.
+  if (assignees && assignees.length > 0) {
+    for (const assignee of assignees) {
+      finalLabels.push(`assignee:${assignee.toLowerCase()}`);
+    }
+  }
+
   const issue = await ghFetch(`/repos/${GITHUB_OWNER}/${repo}/issues`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       title,
       body: body || '',
-      assignees: assignees || [],
-      labels: labels || [],
+      labels: finalLabels,
     }),
   });
 
@@ -198,10 +220,25 @@ export async function updateIssue(
     labels?: string[];
   }
 ): Promise<GitHubTask> {
+  const payload: any = { ...updates };
+  
+  if (payload.assignees) {
+    // If we're updating assignees, we need to convert them to labels
+    // We assume the caller provides the *new* full list of labels in `updates.labels`
+    // If they didn't, we'd have to fetch current labels first, but the patch endpoint
+    // usually overwrites labels entirely.
+    const labels = [...(payload.labels || [])];
+    for (const a of payload.assignees) {
+      labels.push(`assignee:${a.toLowerCase()}`);
+    }
+    payload.labels = labels;
+    delete payload.assignees; // Don't send to GitHub API
+  }
+
   const issue = await ghFetch(`/repos/${GITHUB_OWNER}/${repo}/issues/${issueNumber}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(updates),
+    body: JSON.stringify(payload),
   });
 
   invalidateCache();
