@@ -32,7 +32,7 @@ const sections: NavSection[] = [
     label: 'Operations',
     items: [
       { id: 'dashboard', label: 'Overview', icon: BarChart3 },
-      { id: 'fleet', label: 'Fleet', icon: Monitor, alertKey: 'fleet' },
+      { id: 'fleet', label: 'Bots', icon: Monitor, alertKey: 'fleet' },
       { id: 'costs', label: 'Costs', icon: DollarSign },
       { id: 'health', label: 'Health', icon: Activity, alertKey: 'health' },
     ],

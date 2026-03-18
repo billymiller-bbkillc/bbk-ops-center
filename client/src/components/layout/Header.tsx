@@ -5,7 +5,7 @@ import type { Panel } from './Sidebar';
 
 const panelNames: Record<Panel, { title: string; breadcrumb: string }> = {
   dashboard: { title: 'Overview', breadcrumb: 'Operations' },
-  fleet: { title: 'Fleet Monitor', breadcrumb: 'Operations' },
+  fleet: { title: 'Bot Monitor', breadcrumb: 'Operations' },
   costs: { title: 'Cost Center', breadcrumb: 'Operations' },
   kanban: { title: 'Task Board', breadcrumb: 'Tools' },
   health: { title: 'System Health', breadcrumb: 'Operations' },

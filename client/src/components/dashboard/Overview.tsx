@@ -4,7 +4,7 @@ import { StatCard } from '@/components/ui/stat-card';
 import { ChartCard } from '@/components/ui/chart-card';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { formatCost, formatTokens, formatUptime } from '@/lib/utils';
-import type { Agent, NodeHealth, CostSummary, Task } from '@shared/types';
+import type { Bot, NodeHealth, CostSummary, Task } from '@shared/types';
 import {
   Bot, DollarSign, Activity, LayoutGrid, Clock,
 } from 'lucide-react';
@@ -30,14 +30,14 @@ const CHART_TOOLTIP_STYLE = {
 };
 
 export function Overview() {
-  const { data: agents } = useApi<Agent[]>('/api/agents');
+  const { data: agents } = useApi<Bot[]>('/api/agents');
   const { data: nodes } = useApi<NodeHealth[]>('/api/health');
   const { data: costSummary } = useApi<CostSummary>('/api/costs/summary?period=month');
   const { data: tasks } = useApi<Task[]>('/api/tasks');
 
-  const onlineAgents = agents?.filter(a => a.status === 'online' || a.status === 'busy').length || 0;
-  const totalAgents = agents?.length || 0;
-  const errorAgents = agents?.filter(a => a.status === 'error').length || 0;
+  const onlineBots = agents?.filter(a => a.status === 'online' || a.status === 'busy').length || 0;
+  const totalBots = agents?.length || 0;
+  const errorBots = agents?.filter(a => a.status === 'error').length || 0;
 
   const healthyNodes = nodes?.filter(n => n.status === 'healthy').length || 0;
   const totalNodes = nodes?.length || 0;
@@ -46,7 +46,7 @@ export function Overview() {
   const inProgressTasks = tasks?.filter(t => t.column === 'in_progress').length || 0;
   const totalTasks = tasks?.length || 0;
 
-  // Agent status breakdown for pie chart
+  // Bot status breakdown for pie chart
   const statusCounts = {
     online: agents?.filter(a => a.status === 'online').length || 0,
     busy: agents?.filter(a => a.status === 'busy').length || 0,
@@ -70,10 +70,10 @@ export function Overview() {
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6">
         <StatCard
           icon={Bot}
-          label="Fleet Status"
-          value={`${onlineAgents}/${totalAgents}`}
-          subtitle={errorAgents > 0 ? `${errorAgents} agent${errorAgents > 1 ? 's' : ''} in error state` : 'All agents operational'}
-          accentColor={errorAgents > 0 ? 'red' : 'green'}
+          label="Bot Status"
+          value={`${onlineBots}/${totalBots}`}
+          subtitle={errorBots > 0 ? `${errorBots} bot${errorBots > 1 ? 's' : ''} in error state` : 'All bots operational'}
+          accentColor={errorBots > 0 ? 'red' : 'green'}
         />
         <StatCard
           icon={DollarSign}
@@ -143,8 +143,8 @@ export function Overview() {
           </ResponsiveContainer>
         </ChartCard>
 
-        {/* Agent status donut */}
-        <ChartCard title="Agent Status" subtitle="Current fleet breakdown">
+        {/* Bot status donut */}
+        <ChartCard title="Bot Status" subtitle="Current fleet breakdown">
           <ResponsiveContainer width="100%" height={200}>
             <PieChart>
               <Pie
@@ -183,7 +183,7 @@ export function Overview() {
       {/* Bottom row */}
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
         {/* Recent activity */}
-        <ChartCard title="Recent Agent Activity" subtitle="Latest fleet updates">
+        <ChartCard title="Recent Bot Activity" subtitle="Latest fleet updates">
           <div className="space-y-3 max-h-[300px] overflow-y-auto">
             {agents
               ?.sort((a, b) => new Date(b.lastSeen).getTime() - new Date(a.lastSeen).getTime())

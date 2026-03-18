@@ -24,7 +24,7 @@ function AgentDetail({ agent, onBack }: { agent: Agent; onBack: () => void }) {
   return (
     <div className="space-y-6">
       <Button variant="ghost" size="sm" onClick={onBack} className="gap-2 text-muted-foreground hover:text-foreground">
-        <ArrowLeft className="w-4 h-4" /> Back to Fleet
+        <ArrowLeft className="w-4 h-4" /> Back to Bots
       </Button>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6">
@@ -142,7 +142,7 @@ export function FleetMonitor() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h2 className="text-lg font-semibold tracking-tight">Fleet Monitor</h2>
+        <h2 className="text-lg font-semibold tracking-tight">Bots Monitor</h2>
         <p className="text-sm text-muted-foreground">
           {agents?.filter(a => a.status !== 'offline').length || 0} of {agents?.length || 0} agents active
         </p>
