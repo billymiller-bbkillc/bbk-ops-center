@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { Sidebar, type Panel } from '@/components/layout/Sidebar';
 import { Header } from '@/components/layout/Header';
 import { Overview } from '@/components/dashboard/Overview';
@@ -12,13 +12,11 @@ import { useSSE } from '@/hooks/useSSE';
 
 function App() {
   const [activePanel, setActivePanel] = useState<Panel>('dashboard');
+  const [sseConnected, setSseConnected] = useState(true);
 
   // SSE handlers for live updates
   useSSE({
-    'agent-update': (data) => {
-      // Components will refetch on their own via useApi
-      // Could add global state management here later
-    },
+    'agent-update': (data) => {},
     'health-update': (data) => {},
     'cost-update': (data) => {},
     'crm-update': (data) => {},
@@ -39,12 +37,14 @@ function App() {
   }, [activePanel]);
 
   return (
-    <div className="flex h-screen overflow-hidden">
+    <div className="flex h-screen overflow-hidden bg-background">
       <Sidebar activePanel={activePanel} onNavigate={setActivePanel} />
       <div className="flex flex-col flex-1 overflow-hidden">
-        <Header />
-        <main className="flex-1 overflow-y-auto p-4">
-          {renderPanel()}
+        <Header activePanel={activePanel} sseConnected={sseConnected} />
+        <main className="flex-1 overflow-y-auto p-6">
+          <div key={activePanel} className="panel-enter">
+            {renderPanel()}
+          </div>
         </main>
       </div>
     </div>
