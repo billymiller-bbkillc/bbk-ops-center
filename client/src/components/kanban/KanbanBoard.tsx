@@ -15,6 +15,7 @@ import {
   Loader2,
   AlertCircle,
   Globe,
+  Edit2,
 } from 'lucide-react';
 import * as Dialog from '@radix-ui/react-dialog';
 
@@ -76,10 +77,12 @@ function TaskCard({
   task,
   onDragStart,
   onDelete,
+  onEdit,
 }: {
   task: GitHubTask;
   onDragStart: (e: React.DragEvent, id: string) => void;
   onDelete: (id: string) => void;
+  onEdit: (task: GitHubTask) => void;
 }) {
   return (
     <div
@@ -103,6 +106,16 @@ function TaskCard({
           <ExternalLink className="w-3 h-3 opacity-0 group-hover:opacity-60 shrink-0" />
         </a>
         <div className="flex items-center gap-1 shrink-0">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onEdit(task);
+            }}
+            className="opacity-0 group-hover:opacity-100 hover:text-blue-400 text-zinc-500 transition-all p-0.5 rounded"
+            title="Edit issue"
+          >
+            <Edit2 className="w-3 h-3" />
+          </button>
           <button
             onClick={(e) => {
               e.stopPropagation();
@@ -151,18 +164,21 @@ function TaskCard({
   );
 }
 
-// ===== Create Task Modal =====
+// ===== Create/Edit Task Modal =====
 function CreateTaskModal({
   open,
   onOpenChange,
   defaultColumn,
   onCreated,
+  editTask,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   defaultColumn: TaskColumn;
   onCreated: () => void;
+  editTask?: GitHubTask | null;
 }) {
+  const isEditMode = !!editTask;
   const [repo, setRepo] = useState(REPOS[0]);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -171,6 +187,19 @@ function CreateTaskModal({
   const [column, setColumn] = useState<TaskColumn>(defaultColumn);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+
+  // Pre-fill form when editTask changes
+  React.useEffect(() => {
+    if (editTask) {
+      setRepo(editTask.repo);
+      setTitle(editTask.title);
+      setDescription(editTask.description || '');
+      setAssignee(editTask.assignee || '');
+      setPriority(editTask.priority);
+      setColumn(editTask.column);
+      setError('');
+    }
+  }, [editTask]);
 
   const reset = () => {
     setTitle('');
@@ -191,25 +220,56 @@ function CreateTaskModal({
     setError('');
 
     try {
-      const url = '/api/github-tasks';
-      const body = { repo, title, description, assignee: assignee || null, priority, column };
-
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
-      const json = await res.json();
-      if (!json.success) throw new Error(json.error || 'Failed to create task');
+      if (isEditMode) {
+        // Edit mode — PATCH existing issue
+        const url = `/api/github-tasks/${editTask.repo}/${editTask.issueNumber}`;
+        const body = {
+          title,
+          description,
+          assignee: assignee || null,
+          priority,
+          column,
+          // Rebuild labels so backend gets a full set (column + priority labels preserved)
+          labels: [
+            ...(editTask.labels || []).filter(
+              (l) =>
+                !l.startsWith('assignee:') &&
+                !Object.keys({ backlog: 1, todo: 1, 'in-progress': 1, review: 1, done: 1 }).includes(l.toLowerCase()) &&
+                !l.toLowerCase().startsWith('priority:')
+            ),
+            // Column label
+            ({ backlog: 'backlog', todo: 'todo', in_progress: 'in-progress', review: 'review', done: 'done' } as Record<TaskColumn, string>)[column],
+            // Priority label
+            `priority:${priority}`,
+          ],
+        };
+        const res = await fetch(url, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        const json = await res.json();
+        if (!json.success) throw new Error(json.error || 'Failed to update task');
+      } else {
+        // Create mode
+        const url = '/api/github-tasks';
+        const body = { repo, title, description, assignee: assignee || null, priority, column };
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        const json = await res.json();
+        if (!json.success) throw new Error(json.error || 'Failed to create task');
+      }
 
       reset();
       onOpenChange(false);
-      // Give GitHub API 1.5 seconds to index the new issue before we fetch again
       setTimeout(() => {
         onCreated();
       }, 1500);
     } catch (err: any) {
-      setError(err.message || 'Failed to create task');
+      setError(err.message || (isEditMode ? 'Failed to update task' : 'Failed to create task'));
     } finally {
       setSubmitting(false);
     }
@@ -220,21 +280,33 @@ function CreateTaskModal({
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50" />
         <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-zinc-900 border border-zinc-700 rounded-2xl p-6 w-full max-w-md z-50 shadow-2xl">
-          <Dialog.Title className="text-lg font-semibold mb-4">Create GitHub Issue</Dialog.Title>
+          <Dialog.Title className="text-lg font-semibold mb-4">
+            {isEditMode ? 'Edit Task' : 'Create GitHub Issue'}
+          </Dialog.Title>
 
           <div className="space-y-3">
-            <div>
-              <label className="text-xs text-zinc-400 mb-1 block">Repository</label>
-              <select
-                value={repo}
-                onChange={(e) => setRepo(e.target.value)}
-                className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-zinc-500"
-              >
-                {REPOS.map((r) => (
-                  <option key={r} value={r}>{r}</option>
-                ))}
-              </select>
-            </div>
+            {isEditMode ? (
+              <div>
+                <label className="text-xs text-zinc-400 mb-1 block">Repository</label>
+                <div className="w-full bg-zinc-800/50 border border-zinc-700/50 rounded-lg px-3 py-2 text-sm text-zinc-400 cursor-not-allowed flex items-center gap-1.5">
+                  <GitBranch className="w-3 h-3" />
+                  {editTask.repo}
+                </div>
+              </div>
+            ) : (
+              <div>
+                <label className="text-xs text-zinc-400 mb-1 block">Repository</label>
+                <select
+                  value={repo}
+                  onChange={(e) => setRepo(e.target.value)}
+                  className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-zinc-500"
+                >
+                  {REPOS.map((r) => (
+                    <option key={r} value={r}>{r}</option>
+                  ))}
+                </select>
+              </div>
+            )}
 
             <div>
               <label className="text-xs text-zinc-400 mb-1 block">Title *</label>
@@ -318,10 +390,10 @@ function CreateTaskModal({
               {submitting ? (
                 <>
                   <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
-                  Creating...
+                  {isEditMode ? 'Saving...' : 'Creating...'}
                 </>
               ) : (
-                'Create'
+                isEditMode ? 'Save Changes' : 'Create'
               )}
             </Button>
           </div>
@@ -342,6 +414,7 @@ export function KanbanBoard() {
   // Modal state
   const [createOpen, setCreateOpen] = useState(false);
   const [createColumn, setCreateColumn] = useState<TaskColumn>('backlog');
+  const [editingTask, setEditingTask] = useState<GitHubTask | null>(null);
 
   // Filters
   const [filterRepo, setFilterRepo] = useState('all');
@@ -405,7 +478,14 @@ export function KanbanBoard() {
   );
 
   const openCreateModal = (column: TaskColumn) => {
+    setEditingTask(null);
     setCreateColumn(column);
+    setCreateOpen(true);
+  };
+
+  const openEditModal = (task: GitHubTask) => {
+    setEditingTask(task);
+    setCreateColumn(task.column);
     setCreateOpen(true);
   };
 
@@ -562,6 +642,7 @@ export function KanbanBoard() {
                       task={task}
                       onDragStart={handleDragStart}
                       onDelete={handleDelete}
+                      onEdit={openEditModal}
                     />
                   ))}
                 </div>
@@ -571,12 +652,13 @@ export function KanbanBoard() {
         </div>
       )}
 
-      {/* Create Task Modal */}
+      {/* Create/Edit Task Modal */}
       <CreateTaskModal
         open={createOpen}
-        onOpenChange={setCreateOpen}
+        onOpenChange={(v) => { setCreateOpen(v); if (!v) setEditingTask(null); }}
         defaultColumn={createColumn}
         onCreated={refetch}
+        editTask={editingTask}
       />
     </div>
   );
