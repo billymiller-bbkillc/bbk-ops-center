@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Progress } from '@/components/ui/progress';
 import { useApi } from '@/hooks/useApi';
+import { useSSE } from '@/hooks/useSSE';
 import { formatCost, formatTokens } from '@/lib/utils';
 import type { CostSummary, BudgetAlert, CostPeriod } from '@shared/types';
 import {
@@ -25,8 +26,13 @@ const CHART_TOOLTIP_STYLE = {
 
 export function CostCenter() {
   const [period, setPeriod] = useState<CostPeriod>('month');
-  const { data: summary } = useApi<CostSummary>(`/api/costs/summary?period=${period}`, [period]);
+  const { data: summary, setData: setSummary } = useApi<CostSummary>(`/api/costs/summary?period=${period}`, [period]);
   const { data: alerts } = useApi<BudgetAlert[]>('/api/costs/alerts');
+
+  // Live SSE updates for cost data
+  useSSE({
+    'cost-update': (data) => setSummary(data as CostSummary),
+  });
 
   const agentCount = summary?.byAgent?.length || 0;
   const avgCostPerAgent = agentCount > 0 ? (summary?.totalCost || 0) / agentCount : 0;

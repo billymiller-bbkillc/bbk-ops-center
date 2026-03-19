@@ -1,8 +1,18 @@
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef } from 'react';
 
 type SSEHandler = (data: unknown) => void;
 
-export function useSSE(handlers: Record<string, SSEHandler>) {
+const SSE_EVENTS = [
+  'agent-update',
+  'health-update',
+  'cost-update',
+  'task-update',
+  'crm-update',
+  'n8n-update',
+  'github-task-update',
+] as const;
+
+export function useSSE(handlers: Partial<Record<(typeof SSE_EVENTS)[number], SSEHandler>>) {
   const eventSourceRef = useRef<EventSource | null>(null);
   const handlersRef = useRef(handlers);
   handlersRef.current = handlers;
@@ -11,21 +21,17 @@ export function useSSE(handlers: Record<string, SSEHandler>) {
     const es = new EventSource('/api/sse/stream');
     eventSourceRef.current = es;
 
-    es.addEventListener('agent-update', (e) => {
-      handlersRef.current['agent-update']?.(JSON.parse(e.data));
-    });
-
-    es.addEventListener('health-update', (e) => {
-      handlersRef.current['health-update']?.(JSON.parse(e.data));
-    });
-
-    es.addEventListener('cost-update', (e) => {
-      handlersRef.current['cost-update']?.(JSON.parse(e.data));
-    });
-
-    es.addEventListener('task-update', (e) => {
-      handlersRef.current['task-update']?.(JSON.parse(e.data));
-    });
+    // Register a listener for every known event type
+    for (const event of SSE_EVENTS) {
+      es.addEventListener(event, (e: MessageEvent) => {
+        try {
+          const parsed = JSON.parse(e.data);
+          handlersRef.current[event]?.(parsed);
+        } catch {
+          // ignore parse errors
+        }
+      });
+    }
 
     es.addEventListener('connected', () => {
       console.log('SSE connected');

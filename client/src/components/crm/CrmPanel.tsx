@@ -3,6 +3,7 @@ import { Badge } from '@/components/ui/badge';
 import { StatCard } from '@/components/ui/stat-card';
 import { ChartCard } from '@/components/ui/chart-card';
 import { useApi } from '@/hooks/useApi';
+import { useSSE } from '@/hooks/useSSE';
 import type {
   CrmQuickStats,
   CrmTenant,
@@ -155,10 +156,15 @@ function useSortable<T>(data: T[] | null, defaultKey: keyof T, defaultDir: SortD
 // ===== Main Panel =====
 
 export function CrmPanel() {
-  const { data: stats } = useApi<CrmQuickStats>('/api/crm/stats');
+  const { data: stats, setData: setStats } = useApi<CrmQuickStats>('/api/crm/stats');
   const { data: tenants } = useApi<CrmTenant[]>('/api/crm/tenants');
   const { data: allUsers } = useApi<CrmUser[]>('/api/crm/users');
   const { data: loginEvents } = useApi<CrmLoginEvent[]>('/api/crm/logins');
+
+  // Live SSE updates for CRM quick stats
+  useSSE({
+    'crm-update': (data) => setStats(data as CrmQuickStats),
+  });
 
   const [selectedTenantId, setSelectedTenantId] = useState<string | null>(null);
 

@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { ChartCard } from '@/components/ui/chart-card';
 import { useApi } from '@/hooks/useApi';
+import { useSSE } from '@/hooks/useSSE';
 import { formatUptime, formatBytes } from '@/lib/utils';
 import type { NodeHealth } from '@shared/types';
 import { Server, Cpu, MemoryStick, HardDrive, Clock, Bot } from 'lucide-react';
@@ -56,7 +57,12 @@ function GaugeChart({ value, label, detail }: { value: number; label: string; de
 }
 
 export function SystemHealth() {
-  const { data: nodes } = useApi<NodeHealth[]>('/api/health');
+  const { data: nodes, setData: setNodes } = useApi<NodeHealth[]>('/api/health');
+
+  // Live SSE updates
+  useSSE({
+    'health-update': (data) => setNodes(data as NodeHealth[]),
+  });
 
   const overallStatus = nodes?.some(n => n.status === 'critical') ? 'critical' :
     nodes?.some(n => n.status === 'warning') ? 'warning' : 'healthy';

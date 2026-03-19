@@ -2,6 +2,7 @@ import React, { useState, useCallback, useMemo } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useApi } from '@/hooks/useApi';
+import { useSSE } from '@/hooks/useSSE';
 import { cn } from '@/lib/utils';
 import type { GitHubTask, TaskColumn, TaskPriority } from '@shared/types';
 import {
@@ -406,6 +407,13 @@ function CreateTaskModal({
 // ===== Main Kanban Board =====
 export function KanbanBoard() {
   const { data: githubTasks, loading, error, refetch, setData: setGhTasks } = useApi<GitHubTask[]>('/api/github-tasks');
+
+  // Live SSE updates — swap task list when server pushes new data
+  useSSE({
+    'github-task-update': (data) => {
+      setGhTasks(data as GitHubTask[]);
+    },
+  });
 
   // Drag state
   const [draggedTask, setDraggedTask] = useState<string | null>(null);

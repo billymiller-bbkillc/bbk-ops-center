@@ -191,6 +191,7 @@ export type SSEEventType =
   | 'task-update'
   | 'crm-update'
   | 'n8n-update'
+  | 'github-task-update'
   | 'heartbeat';
 
 export interface SSEEvent {

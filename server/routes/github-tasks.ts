@@ -8,9 +8,20 @@ import {
   moveIssueToColumn,
   buildLabelsForTask,
 } from '../lib/github';
+import { broadcast } from './sse';
 import type { TaskColumn, TaskPriority } from '../../shared/types';
 
 const router = Router();
+
+/** Fetch all issues and broadcast to SSE clients */
+async function broadcastTasks() {
+  try {
+    const tasks = await getIssues();
+    broadcast('github-task-update', tasks);
+  } catch {
+    // Best-effort; don't fail the response
+  }
+}
 
 // GET /api/github-tasks — all issues across all repos
 router.get('/', async (_req, res) => {
@@ -61,6 +72,9 @@ router.post('/', async (req, res) => {
 
     const task = await createIssue(repo, title, description || '', assignees, labels);
     res.json({ success: true, data: task });
+
+    // Push update to all SSE clients
+    broadcastTasks();
   } catch (err: any) {
     console.error('Failed to create GitHub issue:', err);
     res.status(500).json({ success: false, error: err.message });
@@ -83,6 +97,9 @@ router.patch('/:repo/:issueNumber', async (req, res) => {
 
     const task = await updateIssue(repo, parseInt(issueNumber), updates);
     res.json({ success: true, data: task });
+
+    // Push update to all SSE clients
+    broadcastTasks();
   } catch (err: any) {
     console.error('Failed to update GitHub issue:', err);
     res.status(500).json({ success: false, error: err.message });
@@ -101,6 +118,9 @@ router.patch('/:repo/:issueNumber/move', async (req, res) => {
 
     const task = await moveIssueToColumn(repo, parseInt(issueNumber), column as TaskColumn);
     res.json({ success: true, data: task });
+
+    // Push update to all SSE clients
+    broadcastTasks();
   } catch (err: any) {
     console.error('Failed to move GitHub issue:', err);
     res.status(500).json({ success: false, error: err.message });
@@ -113,6 +133,9 @@ router.delete('/:repo/:issueNumber', async (req, res) => {
     const { repo, issueNumber } = req.params;
     const task = await closeIssue(repo, parseInt(issueNumber));
     res.json({ success: true, data: task });
+
+    // Push update to all SSE clients
+    broadcastTasks();
   } catch (err: any) {
     console.error('Failed to close GitHub issue:', err);
     res.status(500).json({ success: false, error: err.message });

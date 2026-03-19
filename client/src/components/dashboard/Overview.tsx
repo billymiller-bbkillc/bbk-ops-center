@@ -1,5 +1,6 @@
 import React from 'react';
 import { useApi } from '@/hooks/useApi';
+import { useSSE } from '@/hooks/useSSE';
 import { StatCard } from '@/components/ui/stat-card';
 import { ChartCard } from '@/components/ui/chart-card';
 import { StatusBadge } from '@/components/ui/status-badge';
@@ -32,10 +33,16 @@ const CHART_TOOLTIP_STYLE = {
 };
 
 export function Overview() {
-  const { data: agents } = useApi<Agent[]>('/api/agents');
-  const { data: nodes } = useApi<NodeHealth[]>('/api/health');
+  const { data: agents, setData: setAgents } = useApi<Agent[]>('/api/agents');
+  const { data: nodes, setData: setNodes } = useApi<NodeHealth[]>('/api/health');
   const { data: costSummary } = useApi<CostSummary>('/api/costs/summary?period=month');
   const { data: tasks } = useApi<Task[]>('/api/tasks');
+
+  // Live SSE updates
+  useSSE({
+    'agent-update': (data) => setAgents(data as Agent[]),
+    'health-update': (data) => setNodes(data as NodeHealth[]),
+  });
 
   const onlineBots = agents?.filter(a => a.status === 'active' || a.status === 'online' || a.status === 'busy').length || 0;
   const totalBots = agents?.length || 0;

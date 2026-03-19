@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { useApi } from '@/hooks/useApi';
+import { useSSE } from '@/hooks/useSSE';
 import { formatUptime, getStatusBg, getStatusColor } from '@/lib/utils';
 import type { Agent, AgentSession } from '@shared/types';
 import { Bot, Clock, Cpu, ArrowLeft, Search, Filter } from 'lucide-react';
@@ -108,8 +109,13 @@ function AgentDetail({ agent, onBack }: { agent: Agent; onBack: () => void }) {
 }
 
 export function FleetMonitor() {
-  const { data: agents } = useApi<Agent[]>('/api/agents');
+  const { data: agents, setData: setAgents } = useApi<Agent[]>('/api/agents');
   const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null);
+
+  // Live SSE updates
+  useSSE({
+    'agent-update': (data) => setAgents(data as Agent[]),
+  });
   const [filter, setFilter] = useState<FilterTab>('all');
   const [search, setSearch] = useState('');
 

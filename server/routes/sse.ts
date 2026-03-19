@@ -3,6 +3,7 @@ import { getAgents } from '../lib/openclaw';
 import { getNodeHealth } from '../lib/system';
 import { getQuickStats } from '../lib/crm-db';
 import { getN8nSummary, getWorkflows, getExecutions } from '../lib/n8n';
+import { getIssues } from '../lib/github';
 
 const router = Router();
 
@@ -33,6 +34,9 @@ router.get('/stream', (req: Request, res: Response) => {
   });
 });
 
+// Poll interval in ms — single source of truth
+export const SSE_POLL_INTERVAL = 5000;
+
 // Real updates — called from main server on interval
 export async function pollAndBroadcast() {
   try {
@@ -41,6 +45,7 @@ export async function pollAndBroadcast() {
 
     broadcast('agent-update', agents);
     broadcast('health-update', [health]);
+
     // Broadcast CRM quick stats from DB
     try {
       const quickStats = await getQuickStats();
@@ -54,6 +59,14 @@ export async function pollAndBroadcast() {
       workflows: getWorkflows(),
       executions: getExecutions(),
     });
+
+    // Broadcast GitHub issues (mapped to tasks)
+    try {
+      const tasks = await getIssues();
+      broadcast('github-task-update', tasks);
+    } catch {
+      // GitHub API may be rate-limited; don't break SSE loop
+    }
 
     broadcast('heartbeat', { timestamp: new Date().toISOString() });
   } catch (err) {

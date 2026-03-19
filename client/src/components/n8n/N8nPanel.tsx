@@ -2,6 +2,7 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useApi } from '@/hooks/useApi';
+import { useSSE } from '@/hooks/useSSE';
 import type { N8nWorkflow, N8nExecution, N8nSummary } from '@shared/types';
 import {
   Workflow,
@@ -79,9 +80,18 @@ function SummaryCard({ icon: Icon, label, value, color }: {
 }
 
 export function N8nPanel() {
-  const { data: summary } = useApi<N8nSummary>('/api/n8n/summary');
-  const { data: workflows } = useApi<N8nWorkflow[]>('/api/n8n/workflows');
-  const { data: executions } = useApi<N8nExecution[]>('/api/n8n/executions');
+  const { data: summary, setData: setSummary } = useApi<N8nSummary>('/api/n8n/summary');
+  const { data: workflows, setData: setWorkflows } = useApi<N8nWorkflow[]>('/api/n8n/workflows');
+  const { data: executions, setData: setExecutions } = useApi<N8nExecution[]>('/api/n8n/executions');
+
+  // Live SSE updates
+  useSSE({
+    'n8n-update': (data: any) => {
+      if (data?.summary) setSummary(data.summary);
+      if (data?.workflows) setWorkflows(data.workflows);
+      if (data?.executions) setExecutions(data.executions);
+    },
+  });
 
   const successRate =
     summary && summary.totalExecutions > 0

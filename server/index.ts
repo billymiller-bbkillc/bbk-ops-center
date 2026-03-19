@@ -6,7 +6,7 @@ import agentRoutes from './routes/agents';
 import costRoutes from './routes/costs';
 import taskRoutes from './routes/tasks';
 import healthRoutes from './routes/health';
-import sseRoutes, { pollAndBroadcast } from './routes/sse';
+import sseRoutes, { pollAndBroadcast, SSE_POLL_INTERVAL } from './routes/sse';
 import crmRoutes from './routes/crm';
 import n8nRoutes from './routes/n8n';
 import githubTaskRoutes from './routes/github-tasks';
@@ -44,8 +44,8 @@ startCrmPolling();
 // Start N8N polling (every 30s)
 startN8nPolling();
 
-// Poll real metrics every 5 seconds and broadcast via SSE
-setInterval(pollAndBroadcast, 5000);
+// Poll real metrics and broadcast via SSE (interval defined in sse.ts)
+setInterval(pollAndBroadcast, SSE_POLL_INTERVAL);
 
 app.listen(PORT, () => {
   console.log(`⚡ BBK Ops Center API running on http://localhost:${PORT}`);
