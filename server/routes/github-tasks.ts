@@ -9,7 +9,7 @@ import {
   buildLabelsForTask,
 } from '../lib/github';
 import { broadcast } from './sse';
-import type { TaskColumn, TaskPriority } from '../../shared/types';
+import type { GitHubTaskStatus, TaskColumn, TaskPriority } from '../../shared/types';
 
 const router = Router();
 
@@ -58,7 +58,7 @@ router.get('/:repo', async (req, res) => {
 // POST /api/github-tasks — create a new issue
 router.post('/', async (req, res) => {
   try {
-    const { repo, title, description, assignee, priority, column } = req.body;
+    const { repo, title, description, assignee, priority, column, subStatus } = req.body;
 
     if (!repo || !title) {
       return res.status(400).json({ success: false, error: 'repo and title are required' });
@@ -66,7 +66,8 @@ router.post('/', async (req, res) => {
 
     const labels = buildLabelsForTask(
       (column as TaskColumn) || 'backlog',
-      (priority as TaskPriority) || 'medium'
+      (priority as TaskPriority) || 'medium',
+      (subStatus as GitHubTaskStatus) || undefined
     );
     const assignees = assignee ? [assignee.toLowerCase()] : [];
 

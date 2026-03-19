@@ -1,4 +1,4 @@
-import type { GitHubTask, TaskColumn, TaskPriority } from '../../shared/types';
+import type { GitHubTask, GitHubTaskStatus, TaskColumn, TaskPriority } from '../../shared/types';
 
 const GITHUB_PAT = process.env.GITHUB_PAT || '';
 const GITHUB_OWNER = process.env.GITHUB_OWNER || 'billymiller-bbkillc';
@@ -43,6 +43,19 @@ const PRIORITY_TO_LABEL: Record<TaskPriority, string> = {
   high: 'priority:high',
   medium: 'priority:medium',
   low: 'priority:low',
+};
+
+const SUB_STATUS_LABELS: Record<string, GitHubTaskStatus> = {
+  'status:accepted': 'accepted',
+  'status:transferring': 'transferring',
+  'status:info-needed': 'info_needed',
+};
+
+const SUB_STATUS_TO_LABEL: Record<GitHubTaskStatus, string | null> = {
+  none: null,
+  accepted: 'status:accepted',
+  transferring: 'status:transferring',
+  info_needed: 'status:info-needed',
 };
 
 // Cache
@@ -110,6 +123,16 @@ function mapIssueToTask(issue: any, repoName: string): GitHubTask {
 
   const assignee = assignees[0] || null;
 
+  // Determine sub-status from labels
+  let subStatus: GitHubTaskStatus = 'none';
+  for (const label of labels) {
+    const lower = label.toLowerCase();
+    if (SUB_STATUS_LABELS[lower]) {
+      subStatus = SUB_STATUS_LABELS[lower];
+      break;
+    }
+  }
+
   return {
     id: `${repoName}/${issue.number}`,
     repo: repoName,
@@ -122,6 +145,7 @@ function mapIssueToTask(issue: any, repoName: string): GitHubTask {
     assignees,
     labels,
     url: issue.html_url,
+    subStatus,
     createdAt: issue.created_at,
     updatedAt: issue.updated_at,
   };
@@ -279,12 +303,17 @@ export async function moveIssueToColumn(
 
 export function buildLabelsForTask(
   column: TaskColumn,
-  priority: TaskPriority
+  priority: TaskPriority,
+  subStatus?: GitHubTaskStatus
 ): string[] {
   const labels: string[] = [];
   labels.push(COLUMN_TO_LABEL[column]);
   labels.push(PRIORITY_TO_LABEL[priority]);
+  if (subStatus && subStatus !== 'none') {
+    const statusLabel = SUB_STATUS_TO_LABEL[subStatus];
+    if (statusLabel) labels.push(statusLabel);
+  }
   return labels;
 }
 
-export { KNOWN_REPOS, COLUMN_TO_LABEL, PRIORITY_TO_LABEL };
+export { KNOWN_REPOS, COLUMN_TO_LABEL, PRIORITY_TO_LABEL, SUB_STATUS_TO_LABEL, SUB_STATUS_LABELS };

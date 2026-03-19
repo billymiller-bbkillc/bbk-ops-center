@@ -201,6 +201,8 @@ export interface SSEEvent {
 }
 
 // ===== GitHub Task Types =====
+export type GitHubTaskStatus = 'none' | 'accepted' | 'transferring' | 'info_needed';
+
 export interface GitHubTask {
   id: string; // "repo/issueNumber"
   repo: string;
@@ -213,6 +215,7 @@ export interface GitHubTask {
   assignees: string[];
   labels: string[];
   url: string; // GitHub issue URL
+  subStatus?: GitHubTaskStatus;
   createdAt: string;
   updatedAt: string;
 }
