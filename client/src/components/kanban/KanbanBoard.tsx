@@ -3,10 +3,9 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useApi } from '@/hooks/useApi';
 import { cn } from '@/lib/utils';
-import type { Task, GitHubTask, TaskColumn, TaskPriority } from '@shared/types';
+import type { GitHubTask, TaskColumn, TaskPriority } from '@shared/types';
 import {
   Plus,
-  User,
   GripVertical,
   Trash2,
   ExternalLink,
@@ -15,9 +14,7 @@ import {
   X,
   Loader2,
   AlertCircle,
-  ArrowUpRight,
   Globe,
-  HardDrive,
 } from 'lucide-react';
 import * as Dialog from '@radix-ui/react-dialog';
 
@@ -33,7 +30,6 @@ const COLUMNS: { id: TaskColumn; label: string; color: string; bg: string }[] = 
 const ASSIGNEES = ['Billy', 'Ashley', 'Basil', 'Bo', 'Bubba', 'Butter', 'Kosi', 'Maria', 'Sophie', 'Woody'];
 
 const REPOS = [
-  'Billy-Miller-Professional-portfolio',
   'SalesPipeCRM',
   'bbk-ops-center',
   'clarigo',
@@ -42,6 +38,7 @@ const REPOS = [
   'nexfolio-launchpad-crm',
   'realforeclosure-bot-files',
   'repo',
+  'Billy-Miller-Professional-portfolio',
 ];
 
 const PRIORITIES: TaskPriority[] = ['low', 'medium', 'high', 'critical'];
@@ -60,39 +57,6 @@ const PRIORITY_BADGE: Record<TaskPriority, { class: string; label: string }> = {
   low: { class: 'bg-blue-500/15 text-blue-400 border-blue-500/30', label: 'Low' },
 };
 
-type TaskSource = 'github' | 'local';
-
-// Unified wrapper so both types can live in the same list
-interface UnifiedTask {
-  source: TaskSource;
-  id: string;
-  title: string;
-  description: string;
-  priority: TaskPriority;
-  column: TaskColumn;
-  assignee: string | null;
-  updatedAt: string;
-  // GitHub-specific
-  repo?: string;
-  issueNumber?: number;
-  url?: string;
-  labels?: string[];
-  assignees?: string[];
-  // Local-specific
-  businessUnit?: string;
-  order?: number;
-  createdAt?: string;
-  dueDate?: string | null;
-}
-
-function toUnifiedGitHub(t: GitHubTask): UnifiedTask {
-  return { source: 'github', ...t };
-}
-
-function toUnifiedLocal(t: Task): UnifiedTask {
-  return { source: 'local', ...t };
-}
-
 // ===== Utility =====
 function timeAgo(dateStr: string): string {
   const seconds = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000);
@@ -107,20 +71,20 @@ function capitalize(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
-// ===== GitHub Task Card =====
-function GitHubTaskCard({
+// ===== Task Card =====
+function TaskCard({
   task,
   onDragStart,
   onDelete,
 }: {
-  task: UnifiedTask;
-  onDragStart: (e: React.DragEvent, id: string, source: TaskSource) => void;
+  task: GitHubTask;
+  onDragStart: (e: React.DragEvent, id: string) => void;
   onDelete: (id: string) => void;
 }) {
   return (
     <div
       draggable
-      onDragStart={(e) => onDragStart(e, task.id, 'github')}
+      onDragStart={(e) => onDragStart(e, task.id)}
       className={cn(
         'group bg-zinc-900/60 border border-zinc-700/50 rounded-xl p-3 cursor-grab active:cursor-grabbing',
         'hover:border-zinc-600 transition-all duration-200 border-l-[3px]',
@@ -158,10 +122,6 @@ function GitHubTaskCard({
       )}
 
       <div className="flex items-center gap-1.5 mt-2.5 flex-wrap">
-        <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 font-medium flex items-center gap-0.5">
-          <GitBranch className="w-2.5 h-2.5" />
-          GitHub
-        </span>
         <span
           className={cn(
             'text-[10px] px-1.5 py-0.5 rounded-md border font-medium',
@@ -191,197 +151,6 @@ function GitHubTaskCard({
   );
 }
 
-// ===== Local Task Card =====
-function LocalTaskCard({
-  task,
-  onDragStart,
-  onDelete,
-  onMigrateToGitHub,
-}: {
-  task: UnifiedTask;
-  onDragStart: (e: React.DragEvent, id: string, source: TaskSource) => void;
-  onDelete: (id: string) => void;
-  onMigrateToGitHub: (task: UnifiedTask) => void;
-}) {
-  return (
-    <div
-      draggable
-      onDragStart={(e) => onDragStart(e, task.id, 'local')}
-      className={cn(
-        'group bg-zinc-900/60 border border-zinc-700/50 rounded-xl p-3 cursor-grab active:cursor-grabbing',
-        'hover:border-zinc-600 transition-all duration-200 border-l-[3px]',
-        PRIORITY_BORDER[task.priority]
-      )}
-    >
-      <div className="flex items-start justify-between gap-2">
-        <p className="text-sm font-medium leading-tight">{task.title}</p>
-        <div className="flex items-center gap-1 shrink-0">
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onMigrateToGitHub(task);
-            }}
-            className="opacity-0 group-hover:opacity-100 hover:text-emerald-400 text-zinc-500 transition-all p-0.5 rounded"
-            title="Migrate to GitHub Issue"
-          >
-            <ArrowUpRight className="w-3 h-3" />
-          </button>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              if (confirm('Delete this task?')) onDelete(task.id);
-            }}
-            className="opacity-0 group-hover:opacity-100 hover:text-red-400 text-zinc-500 transition-all p-0.5 rounded"
-          >
-            <Trash2 className="w-3 h-3" />
-          </button>
-          <GripVertical className="w-3 h-3 text-zinc-600 opacity-0 group-hover:opacity-60" />
-        </div>
-      </div>
-
-      {task.description && (
-        <p className="text-xs text-zinc-500 mt-1.5 line-clamp-2">{task.description}</p>
-      )}
-
-      <div className="flex items-center gap-1.5 mt-2.5 flex-wrap">
-        <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-violet-500/15 text-violet-400 border border-violet-500/30 font-medium flex items-center gap-0.5">
-          <HardDrive className="w-2.5 h-2.5" />
-          Local
-        </span>
-        <span
-          className={cn(
-            'text-[10px] px-1.5 py-0.5 rounded-md border font-medium',
-            PRIORITY_BADGE[task.priority].class
-          )}
-        >
-          {PRIORITY_BADGE[task.priority].label}
-        </span>
-        {task.businessUnit && (
-          <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-zinc-800 text-zinc-400 border border-zinc-700/50">
-            {task.businessUnit}
-          </span>
-        )}
-      </div>
-
-      <div className="flex items-center justify-between mt-2 text-[10px] text-zinc-500">
-        {task.assignee && (
-          <div className="flex items-center gap-1">
-            <div className="w-4 h-4 rounded-full bg-zinc-700 flex items-center justify-center text-[8px] font-bold text-zinc-300">
-              {capitalize(task.assignee).charAt(0)}
-            </div>
-            <span>{capitalize(task.assignee)}</span>
-          </div>
-        )}
-        <span className="ml-auto">{timeAgo(task.updatedAt)}</span>
-      </div>
-    </div>
-  );
-}
-
-// ===== Migrate to GitHub Modal =====
-function MigrateToGitHubModal({
-  open,
-  onOpenChange,
-  task,
-  onMigrated,
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  task: UnifiedTask | null;
-  onMigrated: () => void;
-}) {
-  const [repo, setRepo] = useState(REPOS[1]); // Default to SalesPipeCRM
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState('');
-
-  const handleMigrate = async () => {
-    if (!task) return;
-    setSubmitting(true);
-    setError('');
-    try {
-      const res = await fetch(`/api/tasks/${task.id}/migrate-to-github`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ repo }),
-      });
-      const json = await res.json();
-      if (!json.success) throw new Error(json.error || 'Migration failed');
-      onOpenChange(false);
-      setTimeout(() => onMigrated(), 1500);
-    } catch (err: any) {
-      setError(err.message || 'Migration failed');
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  return (
-    <Dialog.Root open={open} onOpenChange={onOpenChange}>
-      <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50" />
-        <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-zinc-900 border border-zinc-700 rounded-2xl p-6 w-full max-w-md z-50 shadow-2xl">
-          <Dialog.Title className="text-lg font-semibold mb-2">
-            Migrate to GitHub Issue
-          </Dialog.Title>
-          <p className="text-sm text-zinc-400 mb-4">
-            This will create a GitHub issue and delete the local task.
-          </p>
-
-          {task && (
-            <div className="bg-zinc-800/60 border border-zinc-700/50 rounded-lg p-3 mb-4">
-              <p className="text-sm font-medium">{task.title}</p>
-              {task.description && (
-                <p className="text-xs text-zinc-500 mt-1 line-clamp-2">{task.description}</p>
-              )}
-            </div>
-          )}
-
-          <div>
-            <label className="text-xs text-zinc-400 mb-1 block">Target Repository</label>
-            <select
-              value={repo}
-              onChange={(e) => setRepo(e.target.value)}
-              className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-zinc-500"
-            >
-              {REPOS.map((r) => (
-                <option key={r} value={r}>{r}</option>
-              ))}
-            </select>
-          </div>
-
-          {error && (
-            <div className="flex items-center gap-2 text-red-400 text-xs bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2 mt-3">
-              <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-              {error}
-            </div>
-          )}
-
-          <div className="flex justify-end gap-2 mt-5">
-            <Dialog.Close asChild>
-              <Button variant="ghost" size="sm" className="text-zinc-400">
-                Cancel
-              </Button>
-            </Dialog.Close>
-            <Button size="sm" onClick={handleMigrate} disabled={submitting}>
-              {submitting ? (
-                <>
-                  <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
-                  Migrating...
-                </>
-              ) : (
-                <>
-                  <ArrowUpRight className="w-3.5 h-3.5 mr-1.5" />
-                  Migrate
-                </>
-              )}
-            </Button>
-          </div>
-        </Dialog.Content>
-      </Dialog.Portal>
-    </Dialog.Root>
-  );
-}
-
 // ===== Create Task Modal =====
 function CreateTaskModal({
   open,
@@ -394,8 +163,7 @@ function CreateTaskModal({
   defaultColumn: TaskColumn;
   onCreated: () => void;
 }) {
-  const [taskSource, setTaskSource] = useState<TaskSource>('github');
-  const [repo, setRepo] = useState(REPOS[1]); // Default to SalesPipeCRM
+  const [repo, setRepo] = useState(REPOS[0]);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [assignee, setAssignee] = useState('');
@@ -411,8 +179,7 @@ function CreateTaskModal({
     setPriority('medium');
     setColumn(defaultColumn);
     setError('');
-    setRepo(REPOS[1]);
-    setTaskSource('github');
+    setRepo(REPOS[0]);
   };
 
   const handleSubmit = async () => {
@@ -424,18 +191,8 @@ function CreateTaskModal({
     setError('');
 
     try {
-      const url = taskSource === 'github' ? '/api/github-tasks' : '/api/tasks';
-      const body =
-        taskSource === 'github'
-          ? { repo, title, description, assignee: assignee || null, priority, column }
-          : {
-              title,
-              description,
-              assignee: assignee || null,
-              priority,
-              column,
-              businessUnit: 'BBK Holdings',
-            };
+      const url = '/api/github-tasks';
+      const body = { repo, title, description, assignee: assignee || null, priority, column };
 
       const res = await fetch(url, {
         method: 'POST',
@@ -447,7 +204,10 @@ function CreateTaskModal({
 
       reset();
       onOpenChange(false);
-      setTimeout(() => onCreated(), 1500);
+      // Give GitHub API 1.5 seconds to index the new issue before we fetch again
+      setTimeout(() => {
+        onCreated();
+      }, 1500);
     } catch (err: any) {
       setError(err.message || 'Failed to create task');
     } finally {
@@ -460,58 +220,21 @@ function CreateTaskModal({
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50" />
         <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-zinc-900 border border-zinc-700 rounded-2xl p-6 w-full max-w-md z-50 shadow-2xl">
-          <Dialog.Title className="text-lg font-semibold mb-4">
-            Create Task
-          </Dialog.Title>
+          <Dialog.Title className="text-lg font-semibold mb-4">Create GitHub Issue</Dialog.Title>
 
           <div className="space-y-3">
-            {/* Source selector */}
             <div>
-              <label className="text-xs text-zinc-400 mb-1.5 block">Task Type</label>
-              <div className="flex items-center gap-1 bg-zinc-800/50 rounded-xl p-1">
-                <button
-                  type="button"
-                  onClick={() => setTaskSource('github')}
-                  className={cn(
-                    'flex-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center justify-center gap-1.5',
-                    taskSource === 'github'
-                      ? 'bg-emerald-600/20 text-emerald-400 border border-emerald-500/30 shadow-sm'
-                      : 'text-zinc-400 hover:text-zinc-300'
-                  )}
-                >
-                  <GitBranch className="w-3 h-3" />
-                  GitHub Issue
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setTaskSource('local')}
-                  className={cn(
-                    'flex-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center justify-center gap-1.5',
-                    taskSource === 'local'
-                      ? 'bg-violet-600/20 text-violet-400 border border-violet-500/30 shadow-sm'
-                      : 'text-zinc-400 hover:text-zinc-300'
-                  )}
-                >
-                  <HardDrive className="w-3 h-3" />
-                  Local Task
-                </button>
-              </div>
+              <label className="text-xs text-zinc-400 mb-1 block">Repository</label>
+              <select
+                value={repo}
+                onChange={(e) => setRepo(e.target.value)}
+                className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-zinc-500"
+              >
+                {REPOS.map((r) => (
+                  <option key={r} value={r}>{r}</option>
+                ))}
+              </select>
             </div>
-
-            {taskSource === 'github' && (
-              <div>
-                <label className="text-xs text-zinc-400 mb-1 block">Repository</label>
-                <select
-                  value={repo}
-                  onChange={(e) => setRepo(e.target.value)}
-                  className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-zinc-500"
-                >
-                  {REPOS.map((r) => (
-                    <option key={r} value={r}>{r}</option>
-                  ))}
-                </select>
-              </div>
-            )}
 
             <div>
               <label className="text-xs text-zinc-400 mb-1 block">Title *</label>
@@ -610,78 +333,37 @@ function CreateTaskModal({
 
 // ===== Main Kanban Board =====
 export function KanbanBoard() {
-  // Data fetching — both sources simultaneously
-  const {
-    data: githubTasks,
-    loading: ghLoading,
-    error: ghError,
-    refetch: ghRefetch,
-    setData: setGhTasks,
-  } = useApi<GitHubTask[]>('/api/github-tasks');
-
-  const {
-    data: localTasks,
-    loading: localLoading,
-    error: localError,
-    refetch: localRefetch,
-    setData: setLocalTasks,
-  } = useApi<Task[]>('/api/tasks');
+  const { data: githubTasks, loading, error, refetch, setData: setGhTasks } = useApi<GitHubTask[]>('/api/github-tasks');
 
   // Drag state
-  const [draggedTask, setDraggedTask] = useState<{ id: string; source: TaskSource } | null>(null);
+  const [draggedTask, setDraggedTask] = useState<string | null>(null);
   const [dragOverColumn, setDragOverColumn] = useState<TaskColumn | null>(null);
 
   // Modal state
   const [createOpen, setCreateOpen] = useState(false);
   const [createColumn, setCreateColumn] = useState<TaskColumn>('backlog');
 
-  // Migrate modal
-  const [migrateOpen, setMigrateOpen] = useState(false);
-  const [migrateTask, setMigrateTask] = useState<UnifiedTask | null>(null);
-
   // Filters
-  const [filterSource, setFilterSource] = useState('all');
   const [filterRepo, setFilterRepo] = useState('all');
   const [filterAssignee, setFilterAssignee] = useState('all');
   const [filterPriority, setFilterPriority] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
 
-  const loading = ghLoading || localLoading;
-  const error = ghError || localError;
-
-  const refetchAll = useCallback(() => {
-    ghRefetch();
-    localRefetch();
-  }, [ghRefetch, localRefetch]);
-
-  // Unified + filtered task list
-  const unifiedTasks = useMemo(() => {
-    const ghUnified = (githubTasks || []).map(toUnifiedGitHub);
-    const localUnified = (localTasks || []).map(toUnifiedLocal);
-    const all = [...ghUnified, ...localUnified];
-
-    return all.filter((t) => {
-      if (filterSource === 'github' && t.source !== 'github') return false;
-      if (filterSource === 'local' && t.source !== 'local') return false;
-      if (filterRepo !== 'all') {
-        if (filterRepo === '__local__') {
-          if (t.source !== 'local') return false;
-        } else {
-          if (t.source !== 'github' || t.repo !== filterRepo) return false;
-        }
-      }
+  // Filter logic
+  const filtered = useMemo(() => {
+    if (!githubTasks) return [];
+    return githubTasks.filter((t) => {
+      if (filterRepo !== 'all' && t.repo !== filterRepo) return false;
       if (filterAssignee !== 'all' && t.assignee !== filterAssignee.toLowerCase()) return false;
       if (filterPriority !== 'all' && t.priority !== filterPriority) return false;
       if (searchQuery && !t.title.toLowerCase().includes(searchQuery.toLowerCase())) return false;
       return true;
     });
-  }, [githubTasks, localTasks, filterSource, filterRepo, filterAssignee, filterPriority, searchQuery]);
-
-  const totalCount = (githubTasks?.length || 0) + (localTasks?.length || 0);
+  }, [githubTasks, filterRepo, filterAssignee, filterPriority, searchQuery]);
 
   // Drag handlers
-  const handleDragStart = useCallback((_e: React.DragEvent, taskId: string, source: TaskSource) => {
-    setDraggedTask({ id: taskId, source });
+  const handleDragStart = useCallback((_e: React.DragEvent, taskId: string) => {
+    setDraggedTask(taskId);
   }, []);
 
   const handleDragOver = useCallback((e: React.DragEvent, column: TaskColumn) => {
@@ -694,37 +376,26 @@ export function KanbanBoard() {
       e.preventDefault();
       if (!draggedTask) return;
 
-      const { id, source } = draggedTask;
-
-      if (source === 'github') {
-        setGhTasks(
-          (prev) => prev?.map((t) => (t.id === id ? { ...t, column } : t)) || null
-        );
-        const [repo, issueNumber] = id.split('/');
-        await fetch(`/api/github-tasks/${repo}/${issueNumber}/move`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ column }),
-        });
-        setTimeout(ghRefetch, 1000);
-      } else {
-        setLocalTasks(
-          (prev) => prev?.map((t) => (t.id === id ? { ...t, column } : t)) || null
-        );
-        await fetch(`/api/tasks/${id}/move`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ column, order: 0 }),
-        });
-      }
+      // Optimistic update
+      setGhTasks(
+        (prev) => prev?.map((t) => (t.id === draggedTask ? { ...t, column } : t)) || null
+      );
+      const [repo, issueNumber] = draggedTask.split('/');
+      await fetch(`/api/github-tasks/${repo}/${issueNumber}/move`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ column }),
+      });
+      // Refetch after a short delay to get accurate state
+      setTimeout(refetch, 1000);
 
       setDraggedTask(null);
       setDragOverColumn(null);
     },
-    [draggedTask, setGhTasks, setLocalTasks, ghRefetch]
+    [draggedTask, setGhTasks, refetch]
   );
 
-  const handleDeleteGitHub = useCallback(
+  const handleDelete = useCallback(
     async (id: string) => {
       setGhTasks((prev) => prev?.filter((t) => t.id !== id) || null);
       const [repo, issueNumber] = id.split('/');
@@ -733,38 +404,19 @@ export function KanbanBoard() {
     [setGhTasks]
   );
 
-  const handleDeleteLocal = useCallback(
-    async (id: string) => {
-      setLocalTasks((prev) => prev?.filter((t) => t.id !== id) || null);
-      await fetch(`/api/tasks/${id}`, { method: 'DELETE' });
-    },
-    [setLocalTasks]
-  );
-
-  const handleMigrateToGitHub = useCallback((task: UnifiedTask) => {
-    setMigrateTask(task);
-    setMigrateOpen(true);
-  }, []);
-
   const openCreateModal = (column: TaskColumn) => {
     setCreateColumn(column);
     setCreateOpen(true);
   };
-
-  const hasActiveFilters = filterSource !== 'all' || filterRepo !== 'all' || filterAssignee !== 'all' || filterPriority !== 'all' || searchQuery;
 
   return (
     <div className="space-y-4 h-full flex flex-col">
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h2 className="text-lg font-semibold">Task Board</h2>
+          <h2 className="text-lg font-semibold">Kanban Board</h2>
           <p className="text-sm text-zinc-500">
-            {totalCount} total tasks
-            <span className="mx-1.5">·</span>
-            <span className="text-emerald-500">{githubTasks?.length || 0} GitHub</span>
-            <span className="mx-1.5">·</span>
-            <span className="text-violet-400">{localTasks?.length || 0} Local</span>
+            {githubTasks?.length || 0} active GitHub issues
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -797,25 +449,11 @@ export function KanbanBoard() {
         </div>
 
         <select
-          value={filterSource}
-          onChange={(e) => {
-            setFilterSource(e.target.value);
-            if (e.target.value === 'local') setFilterRepo('all');
-          }}
-          className="bg-zinc-800/50 border border-zinc-700/50 text-xs rounded-lg px-3 py-1.5 focus:outline-none focus:border-zinc-600 text-zinc-300"
-        >
-          <option value="all">All Sources</option>
-          <option value="github">GitHub Only</option>
-          <option value="local">Local Only</option>
-        </select>
-
-        <select
           value={filterRepo}
           onChange={(e) => setFilterRepo(e.target.value)}
           className="bg-zinc-800/50 border border-zinc-700/50 text-xs rounded-lg px-3 py-1.5 focus:outline-none focus:border-zinc-600 text-zinc-300"
         >
-          <option value="all">All Repos / Local</option>
-          <option value="__local__">Local Tasks</option>
+          <option value="all">All Repos</option>
           {REPOS.map((r) => (
             <option key={r} value={r}>{r}</option>
           ))}
@@ -843,10 +481,9 @@ export function KanbanBoard() {
           ))}
         </select>
 
-        {hasActiveFilters && (
+        {(filterRepo !== 'all' || filterAssignee !== 'all' || filterPriority !== 'all' || searchQuery) && (
           <button
             onClick={() => {
-              setFilterSource('all');
               setFilterRepo('all');
               setFilterAssignee('all');
               setFilterPriority('all');
@@ -864,7 +501,7 @@ export function KanbanBoard() {
         <div className="flex items-center gap-2 text-red-400 text-sm bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3">
           <AlertCircle className="w-4 h-4 shrink-0" />
           <span>{error}</span>
-          <Button variant="ghost" size="sm" className="ml-auto text-xs" onClick={refetchAll}>
+          <Button variant="ghost" size="sm" className="ml-auto text-xs" onClick={refetch}>
             Retry
           </Button>
         </div>
@@ -882,14 +519,7 @@ export function KanbanBoard() {
       {!loading && (
         <div className="grid grid-cols-5 gap-3 flex-1 min-h-0">
           {COLUMNS.map((col) => {
-            const columnTasks = unifiedTasks
-              .filter((t) => t.column === col.id)
-              .sort((a, b) => {
-                // GitHub tasks first, then local sorted by order
-                if (a.source !== b.source) return a.source === 'github' ? -1 : 1;
-                if (a.source === 'local' && b.source === 'local') return (a.order || 0) - (b.order || 0);
-                return 0;
-              });
+            const columnTasks = filtered.filter((t) => t.column === col.id);
 
             return (
               <div
@@ -926,24 +556,14 @@ export function KanbanBoard() {
                 </div>
 
                 <div className="flex-1 overflow-y-auto space-y-2 min-h-[100px]">
-                  {columnTasks.map((task) =>
-                    task.source === 'github' ? (
-                      <GitHubTaskCard
-                        key={`gh-${task.id}`}
-                        task={task}
-                        onDragStart={handleDragStart}
-                        onDelete={handleDeleteGitHub}
-                      />
-                    ) : (
-                      <LocalTaskCard
-                        key={`local-${task.id}`}
-                        task={task}
-                        onDragStart={handleDragStart}
-                        onDelete={handleDeleteLocal}
-                        onMigrateToGitHub={handleMigrateToGitHub}
-                      />
-                    )
-                  )}
+                  {columnTasks.map((task) => (
+                    <TaskCard
+                      key={task.id}
+                      task={task}
+                      onDragStart={handleDragStart}
+                      onDelete={handleDelete}
+                    />
+                  ))}
                 </div>
               </div>
             );
@@ -956,15 +576,7 @@ export function KanbanBoard() {
         open={createOpen}
         onOpenChange={setCreateOpen}
         defaultColumn={createColumn}
-        onCreated={refetchAll}
-      />
-
-      {/* Migrate to GitHub Modal */}
-      <MigrateToGitHubModal
-        open={migrateOpen}
-        onOpenChange={setMigrateOpen}
-        task={migrateTask}
-        onMigrated={refetchAll}
+        onCreated={refetch}
       />
     </div>
   );

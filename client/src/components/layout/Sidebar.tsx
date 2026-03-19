@@ -40,7 +40,7 @@ const sections: NavSection[] = [
   {
     label: 'Tools',
     items: [
-      { id: 'kanban', label: 'Tasks', icon: LayoutGrid },
+      { id: 'kanban', label: 'Kanban Board', icon: LayoutGrid },
     ],
   },
   {

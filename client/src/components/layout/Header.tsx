@@ -7,7 +7,7 @@ const panelNames: Record<Panel, { title: string; breadcrumb: string }> = {
   dashboard: { title: 'Overview', breadcrumb: 'Operations' },
   fleet: { title: 'Bot Monitor', breadcrumb: 'Operations' },
   costs: { title: 'Cost Center', breadcrumb: 'Operations' },
-  kanban: { title: 'Task Board', breadcrumb: 'Tools' },
+  kanban: { title: 'Kanban Board', breadcrumb: 'Tools' },
   health: { title: 'System Health', breadcrumb: 'Operations' },
   crm: { title: 'CRM', breadcrumb: 'Integrations' },
   n8n: { title: 'N8N', breadcrumb: 'Integrations' },
