@@ -9,6 +9,7 @@ import {
   buildLabelsForTask,
 } from '../lib/github';
 import { broadcast } from './sse';
+import { notifyAgentTask } from '../lib/openclaw';
 import type { GitHubTaskStatus, TaskColumn, TaskPriority } from '../../shared/types';
 
 const router = Router();
@@ -76,6 +77,9 @@ router.post('/', async (req, res) => {
 
     // Push update to all SSE clients
     broadcastTasks();
+
+    // Notify assigned agent
+    try { notifyAgentTask(task, 'created'); } catch (e) { /* non-blocking */ }
   } catch (err: any) {
     console.error('Failed to create GitHub issue:', err);
     res.status(500).json({ success: false, error: err.message });
@@ -101,6 +105,11 @@ router.patch('/:repo/:issueNumber', async (req, res) => {
 
     // Push update to all SSE clients
     broadcastTasks();
+
+    // Notify agent if assignee or state changed
+    if (updates.assignees || updates.state) {
+      try { notifyAgentTask(task, 'updated'); } catch (e) { /* non-blocking */ }
+    }
   } catch (err: any) {
     console.error('Failed to update GitHub issue:', err);
     res.status(500).json({ success: false, error: err.message });
@@ -122,6 +131,9 @@ router.patch('/:repo/:issueNumber/move', async (req, res) => {
 
     // Push update to all SSE clients
     broadcastTasks();
+
+    // Notify assigned agent of column change
+    try { notifyAgentTask(task, 'moved'); } catch (e) { /* non-blocking */ }
   } catch (err: any) {
     console.error('Failed to move GitHub issue:', err);
     res.status(500).json({ success: false, error: err.message });
@@ -137,6 +149,9 @@ router.delete('/:repo/:issueNumber', async (req, res) => {
 
     // Push update to all SSE clients
     broadcastTasks();
+
+    // Notify assigned agent of closure
+    try { notifyAgentTask(task, 'closed'); } catch (e) { /* non-blocking */ }
   } catch (err: any) {
     console.error('Failed to close GitHub issue:', err);
     res.status(500).json({ success: false, error: err.message });

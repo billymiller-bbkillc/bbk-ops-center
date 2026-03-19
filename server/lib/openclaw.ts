@@ -364,6 +364,46 @@ export function getAgentSessions(agentId: string): AgentSession[] {
   return sessions.sort((a, b) => b.startedAt.localeCompare(a.startedAt));
 }
 
+// --- Webhook dispatcher: notify agents when tasks change ---
+
+import type { GitHubTask } from '../../shared/types';
+
+type TaskAction = 'created' | 'updated' | 'moved' | 'closed';
+
+export function notifyAgentTask(task: GitHubTask, action: TaskAction): void {
+  if (!task.assignee) return;
+
+  const agentId = task.assignee.toLowerCase();
+
+  let message: string;
+  switch (action) {
+    case 'created':
+      message = `A new task has been assigned to you on the Kanban board:\n\n**Repo:** ${task.repo}\n**Title:** ${task.title}\n**Description:** ${task.description || 'None'}\n**Priority:** ${task.priority}\n\nPlease review this task.`;
+      break;
+    case 'updated':
+      message = `Your task **${task.title}** (${task.repo}) has been updated.`;
+      break;
+    case 'moved':
+      message = `Your task **${task.title}** (${task.repo}) has been moved to the **${task.column}** column.`;
+      break;
+    case 'closed':
+      message = `Your task **${task.title}** (${task.repo}) has been closed.`;
+      break;
+  }
+
+  // Fire-and-forget: don't block the caller
+  fetch(`${GATEWAY_URL}/hooks/agent`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${GATEWAY_TOKEN}`,
+    },
+    body: JSON.stringify({ agentId, message, deliver: true }),
+  }).catch(err => {
+    console.error(`[notifyAgentTask] Failed to notify agent "${agentId}" (action=${action}):`, err instanceof Error ? err.message : err);
+  });
+}
+
 export function getAllAgentUsage(): { agentName: string; agentId: string; usages: ParsedUsage[] }[] {
   const agentDirs = getAgentDirs();
   const result: { agentName: string; agentId: string; usages: ParsedUsage[] }[] = [];
