@@ -107,7 +107,8 @@ router.patch('/:repo/:issueNumber', async (req, res) => {
     broadcastTasks();
 
     // Notify agent if assignee or state changed
-    if (updates.assignees || updates.state) {
+    const hasAssigneeLabelChange = updates.labels?.some((l: string) => l.startsWith('assignee:'));
+    if (updates.assignees || updates.state || hasAssigneeLabelChange) {
       try { notifyAgentTask(task, 'updated'); } catch (e) { /* non-blocking */ }
     }
   } catch (err: any) {
