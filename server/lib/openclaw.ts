@@ -199,7 +199,7 @@ export async function getAgents(): Promise<Agent[]> {
 
     // Determine current task from the latest session key
     let currentTask: string | null = null;
-    if (status !== 'offline' && latestKey) {
+    if ((status as any) !== 'offline' && latestKey) {
       // Session key format: "agent:name:main" or "agent:name:subagent:id"
       if (latestKey.includes(':subagent:')) {
         currentTask = 'Running subagent task';

@@ -172,7 +172,7 @@ export function FleetMonitor() {
       <div>
         <h2 className="text-lg font-semibold tracking-tight">Bots Monitor</h2>
         <p className="text-sm text-muted-foreground">
-          {agents?.filter(a => a.status !== 'idle' && a.status !== 'offline').length || 0} of {agents?.length || 0} bots active
+          {agents?.filter(a => a.status !== 'idle' && (a.status as any) !== 'offline').length || 0} of {agents?.length || 0} bots active
         </p>
       </div>
 

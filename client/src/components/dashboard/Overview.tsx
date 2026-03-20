@@ -49,7 +49,7 @@ export function Overview() {
     'health-update': (data) => setNodes(data as NodeHealth[]),
   });
 
-  const onlineBots = agents?.filter(a => a.status === 'active' || a.status === 'online' || a.status === 'busy').length || 0;
+  const onlineBots = agents?.filter(a => a.status === 'active' || (a.status as any) === 'online' || a.status === 'busy').length || 0;
   const totalBots = agents?.length || 0;
   const errorBots = agents?.filter(a => a.status === 'error').length || 0;
 
@@ -62,9 +62,9 @@ export function Overview() {
 
   // Bot status breakdown for pie chart
   const statusCounts = {
-    active: agents?.filter(a => a.status === 'active' || a.status === 'online').length || 0,
+    active: agents?.filter(a => a.status === 'active' || (a.status as any) === 'online').length || 0,
     busy: agents?.filter(a => a.status === 'busy').length || 0,
-    idle: agents?.filter(a => a.status === 'idle' || a.status === 'offline').length || 0,
+    idle: agents?.filter(a => a.status === 'idle' || (a.status as any) === 'offline').length || 0,
     error: agents?.filter(a => a.status === 'error').length || 0,
   };
   const pieData = Object.entries(statusCounts)
