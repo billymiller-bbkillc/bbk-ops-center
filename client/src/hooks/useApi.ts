@@ -8,7 +8,18 @@ export function useApi<T>(url: string, deps: unknown[] = []) {
   const refetch = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await fetch(url);
+      const token = localStorage.getItem('ops_token');
+      const headers: Record<string, string> = {};
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      
+      const res = await fetch(url, { headers });
+      
+      if (res.status === 401) {
+        // Don't clear token here — let AuthContext handle it
+        setError('Authentication required');
+        return;
+      }
+      
       const json = await res.json();
       if (json.success) {
         setData(json.data);

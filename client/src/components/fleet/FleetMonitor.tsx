@@ -7,7 +7,7 @@ import { useApi } from '@/hooks/useApi';
 import { useSSE } from '@/hooks/useSSE';
 import { formatUptime, getStatusBg, getStatusColor } from '@/lib/utils';
 import type { Agent, AgentSession } from '@shared/types';
-import { Bot, Clock, Cpu, ArrowLeft, Search, Filter } from 'lucide-react';
+import { Bot, Clock, Cpu, ArrowLeft, Search, Filter, Square } from 'lucide-react';
 
 const STATUS_BORDER_COLORS: Record<string, string> = {
   active: 'border-t-emerald-500',
@@ -109,13 +109,33 @@ function AgentDetail({ agent, onBack }: { agent: Agent; onBack: () => void }) {
 }
 
 export function FleetMonitor() {
-  const { data: agents, setData: setAgents } = useApi<Agent[]>('/api/agents');
+  const { data: agents, setData: setAgents, refetch } = useApi<Agent[]>('/api/agents');
   const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null);
 
   // Live SSE updates
   useSSE({
     'agent-update': (data) => setAgents(data as Agent[]),
   });
+
+  const handleKillAgent = async (agentId: string, agentName: string) => {
+    if (!window.confirm(`Stop agent "${agentName}"? This will terminate active sessions.`)) return;
+    try {
+      await fetch(`/api/agents/${agentId}/kill`, { method: 'POST' });
+      refetch();
+    } catch (err) {
+      console.error('Failed to kill agent:', err);
+    }
+  };
+
+  function timeAgo(iso: string): string {
+    const diff = Date.now() - new Date(iso).getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return 'just now';
+    if (mins < 60) return `${mins}m ago`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return `${hrs}h ago`;
+    return `${Math.floor(hrs / 24)}d ago`;
+  }
   const [filter, setFilter] = useState<FilterTab>('all');
   const [search, setSearch] = useState('');
 
@@ -211,21 +231,35 @@ export function FleetMonitor() {
 
               {/* Current task */}
               {agent.currentTask && (
-                <p className="text-xs text-foreground/70 truncate mb-4 bg-muted/30 rounded-lg px-3 py-2">
-                  {agent.currentTask}
-                </p>
+                <div className="mb-4 bg-muted/30 rounded-lg px-3 py-2">
+                  <p className="text-xs text-foreground/70 truncate">{agent.currentTask}</p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">Last seen {timeAgo(agent.lastSeen)}</p>
+                </div>
               )}
 
               {/* Details */}
               <div className="flex items-center justify-between text-xs text-muted-foreground pt-3 border-t border-border/50">
                 <div className="flex items-center gap-1.5">
                   <Cpu className="w-3 h-3" />
-                  <span className="font-mono-nums truncate max-w-[140px]">{agent.model}</span>
+                  <span className="font-mono-nums truncate max-w-[120px]">{agent.model}</span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <Clock className="w-3 h-3" />
                   <span className="font-mono-nums">{formatUptime(agent.uptime)}</span>
                 </div>
+                {(agent.status === 'active' || agent.status === 'busy') && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleKillAgent(agent.id, agent.name);
+                    }}
+                    className="flex items-center gap-1 text-red-400 hover:text-red-300 transition-colors px-1.5 py-0.5 rounded bg-red-500/10 hover:bg-red-500/20"
+                    title="Stop agent"
+                  >
+                    <Square className="w-3 h-3" />
+                    <span className="text-[10px]">Stop</span>
+                  </button>
+                )}
               </div>
             </div>
           </div>

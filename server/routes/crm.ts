@@ -6,6 +6,8 @@ import {
   getUsersByTenant,
   getLoginEvents,
   getLoginStats,
+  getFunnelData,
+  getInactiveTenants,
 } from '../lib/crm-db';
 
 const router = Router();
@@ -74,6 +76,27 @@ router.get('/logins/stats', async (_req, res) => {
   } catch (err) {
     console.error('CRM login stats error:', err);
     res.json({ success: false, error: 'Failed to fetch login stats' });
+  }
+});
+
+router.get('/funnel', async (_req, res) => {
+  try {
+    const funnel = await getFunnelData();
+    res.json({ success: true, data: funnel });
+  } catch (err) {
+    console.error('CRM funnel error:', err);
+    res.json({ success: false, error: 'Failed to fetch funnel data' });
+  }
+});
+
+router.get('/inactive', async (req, res) => {
+  try {
+    const days = req.query.days ? parseInt(String(req.query.days)) : 14;
+    const tenants = await getInactiveTenants(days);
+    res.json({ success: true, data: tenants });
+  } catch (err) {
+    console.error('CRM inactive tenants error:', err);
+    res.json({ success: false, error: 'Failed to fetch inactive tenants' });
   }
 });
 

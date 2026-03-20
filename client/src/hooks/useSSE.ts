@@ -10,6 +10,7 @@ const SSE_EVENTS = [
   'crm-update',
   'n8n-update',
   'github-task-update',
+  'activity-update',
 ] as const;
 
 export function useSSE(handlers: Partial<Record<(typeof SSE_EVENTS)[number], SSEHandler>>) {
@@ -18,7 +19,9 @@ export function useSSE(handlers: Partial<Record<(typeof SSE_EVENTS)[number], SSE
   handlersRef.current = handlers;
 
   useEffect(() => {
-    const es = new EventSource('/api/sse/stream');
+    const token = localStorage.getItem('ops_token');
+    const sseUrl = token ? `/api/sse/stream?token=${encodeURIComponent(token)}` : '/api/sse/stream';
+    const es = new EventSource(sseUrl);
     eventSourceRef.current = es;
 
     // Register a listener for every known event type

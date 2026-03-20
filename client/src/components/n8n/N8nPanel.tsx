@@ -116,6 +116,17 @@ export function N8nPanel() {
         )}
       </div>
 
+      {/* Error Banner */}
+      {summary && summary.failedExecutions > 0 && (
+        <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3 flex items-center gap-3">
+          <AlertTriangle className="w-5 h-5 text-red-400 shrink-0" />
+          <div>
+            <p className="text-sm font-medium text-red-400">{summary.failedExecutions} Failed Execution{summary.failedExecutions > 1 ? 's' : ''}</p>
+            <p className="text-xs text-muted-foreground">Check execution history below for details</p>
+          </div>
+        </div>
+      )}
+
       {/* Summary Cards */}
       <div className="grid grid-cols-4 gap-4">
         <SummaryCard

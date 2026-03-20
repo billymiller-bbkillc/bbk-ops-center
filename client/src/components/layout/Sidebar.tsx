@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { cn } from '@/lib/utils';
 import { useApi } from '@/hooks/useApi';
-import type { Agent } from '@shared/types';
+import { useAuth } from '@/contexts/AuthContext';
+import type { Agent, N8nSummary } from '@shared/types';
 import {
   Monitor,
   DollarSign,
@@ -13,9 +14,12 @@ import {
   Workflow,
   ChevronLeft,
   ChevronRight,
+  ScrollText,
+  Settings,
+  LogOut,
 } from 'lucide-react';
 
-export type Panel = 'dashboard' | 'fleet' | 'costs' | 'kanban' | 'health' | 'crm' | 'n8n';
+export type Panel = 'dashboard' | 'fleet' | 'costs' | 'kanban' | 'health' | 'crm' | 'n8n' | 'activity' | 'settings';
 
 interface SidebarProps {
   activePanel: Panel;
@@ -35,6 +39,7 @@ const sections: NavSection[] = [
       { id: 'fleet', label: 'Bots', icon: Monitor, alertKey: 'fleet' },
       { id: 'costs', label: 'Costs', icon: DollarSign },
       { id: 'health', label: 'Health', icon: Activity, alertKey: 'health' },
+      { id: 'activity' as Panel, label: 'Activity', icon: ScrollText, alertKey: 'activity' },
     ],
   },
   {
@@ -47,7 +52,13 @@ const sections: NavSection[] = [
     label: 'Integrations',
     items: [
       { id: 'crm', label: 'CRM', icon: Users },
-      { id: 'n8n', label: 'N8N', icon: Workflow },
+      { id: 'n8n', label: 'N8N', icon: Workflow, alertKey: 'n8n' },
+    ],
+  },
+  {
+    label: 'Admin',
+    items: [
+      { id: 'settings' as Panel, label: 'Settings', icon: Settings },
     ],
   },
 ];
@@ -55,11 +66,14 @@ const sections: NavSection[] = [
 export function Sidebar({ activePanel, onNavigate }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
   const { data: agents } = useApi<Agent[]>('/api/agents');
+  const { data: n8nSummary } = useApi<N8nSummary>('/api/n8n/summary');
+  const { user, logout, isAdmin } = useAuth();
 
   const hasFleetError = agents?.some(a => a.status === 'error');
 
   function getAlert(key?: string): boolean {
     if (key === 'fleet') return !!hasFleetError;
+    if (key === 'n8n') return (n8nSummary?.failedExecutions || 0) > 0;
     return false;
   }
 
@@ -130,7 +144,28 @@ export function Sidebar({ activePanel, onNavigate }: SidebarProps) {
       </nav>
 
       {/* Footer */}
-      <div className="p-3 border-t border-border">
+      <div className="p-3 border-t border-border space-y-2">
+        {/* User info */}
+        {user && !collapsed && (
+          <div className="flex items-center gap-2 px-2 py-1">
+            <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center text-[10px] font-bold text-primary shrink-0">
+              {user.displayName.charAt(0).toUpperCase()}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-medium truncate">{user.displayName}</p>
+              <p className="text-[10px] text-muted-foreground">{user.role}</p>
+            </div>
+            <button onClick={logout} className="text-muted-foreground hover:text-red-400 transition-colors" title="Sign out">
+              <LogOut className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
+        {user && collapsed && (
+          <button onClick={logout} className="w-full flex items-center justify-center py-1.5 rounded-lg text-muted-foreground hover:text-red-400 transition-all" title="Sign out">
+            <LogOut className="w-4 h-4" />
+          </button>
+        )}
+        
         <button
           onClick={() => setCollapsed(!collapsed)}
           className="w-full flex items-center justify-center gap-2 py-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-all duration-200"
@@ -139,7 +174,7 @@ export function Sidebar({ activePanel, onNavigate }: SidebarProps) {
           {!collapsed && <span className="text-xs">Collapse</span>}
         </button>
         {!collapsed && (
-          <div className="flex items-center gap-2 mt-2 px-2">
+          <div className="flex items-center gap-2 px-2">
             <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
             <span className="text-[10px] text-muted-foreground">Operational</span>
             <span className="text-[10px] text-muted-foreground/50 ml-auto">v2.0</span>

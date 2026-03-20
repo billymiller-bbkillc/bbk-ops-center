@@ -4,11 +4,12 @@ import { useSSE } from '@/hooks/useSSE';
 import { StatCard } from '@/components/ui/stat-card';
 import { ChartCard } from '@/components/ui/chart-card';
 import { StatusBadge } from '@/components/ui/status-badge';
-import { formatCost, formatTokens, formatUptime } from '@/lib/utils';
-import type { Agent, NodeHealth, CostSummary, Task } from '@shared/types';
+import { formatCost, formatTokens, formatUptime, cn } from '@/lib/utils';
+import type { Agent, NodeHealth, CostSummary, Task, ActivityEntry } from '@shared/types';
 import {
-  Bot, DollarSign, Activity, LayoutGrid, Clock,
+  Bot, DollarSign, Activity, LayoutGrid, Clock, Rocket,
 } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell,
@@ -37,6 +38,10 @@ export function Overview() {
   const { data: nodes, setData: setNodes } = useApi<NodeHealth[]>('/api/health');
   const { data: costSummary } = useApi<CostSummary>('/api/costs/summary?period=month');
   const { data: tasks } = useApi<Task[]>('/api/tasks');
+  const { data: recentActivity } = useApi<ActivityEntry[]>('/api/activity/recent?count=10');
+
+  const launchDate = new Date('2026-04-30');
+  const daysUntilLaunch = Math.max(0, Math.ceil((launchDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24)));
 
   // Live SSE updates
   useSSE({
@@ -76,7 +81,7 @@ export function Overview() {
   return (
     <div className="space-y-6">
       {/* Top metric cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-6">
         <StatCard
           icon={Bot}
           label="Bot Status"
@@ -104,6 +109,13 @@ export function Overview() {
           value={`${inProgressTasks}`}
           subtitle={`${totalTasks} total across all boards`}
           accentColor="amber"
+        />
+        <StatCard
+          icon={Rocket}
+          label="Launch Day"
+          value={`${daysUntilLaunch}d`}
+          subtitle="Until April 30, 2026"
+          accentColor="blue"
         />
       </div>
 
@@ -191,7 +203,7 @@ export function Overview() {
 
       {/* Bottom row */}
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-        {/* Recent activity */}
+        {/* Recent bot activity */}
         <ChartCard title="Recent Bot Activity" subtitle="Latest fleet updates">
           <div className="space-y-3 max-h-[300px] overflow-y-auto">
             {agents
@@ -252,6 +264,32 @@ export function Overview() {
           </div>
         </ChartCard>
       </div>
+
+      {/* Activity ticker */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-medium">Recent Activity</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          {recentActivity && recentActivity.length > 0 ? recentActivity.map(a => (
+            <div key={a.id} className="flex items-center gap-3 text-xs">
+              <span className={cn(
+                'w-1.5 h-1.5 rounded-full shrink-0',
+                a.severity === 'critical' ? 'bg-red-500' :
+                a.severity === 'error' ? 'bg-red-400' :
+                a.severity === 'warning' ? 'bg-amber-400' : 'bg-emerald-400'
+              )} />
+              <span className="text-muted-foreground shrink-0">
+                {new Date(a.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              </span>
+              <span className="font-medium truncate">{a.title}</span>
+              <span className="text-muted-foreground truncate ml-auto">{a.source}</span>
+            </div>
+          )) : (
+            <p className="text-xs text-muted-foreground">No recent activity</p>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

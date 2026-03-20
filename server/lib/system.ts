@@ -1,6 +1,8 @@
 import fs from 'fs';
 import { execSync } from 'child_process';
 import type { NodeHealth } from '../../shared/types';
+import { db, schema, sqlite } from '../db';
+import { randomUUID } from 'crypto';
 
 let prevCpuIdle = 0;
 let prevCpuTotal = 0;
@@ -124,4 +126,34 @@ export function getNodeHealth(agentCount: number): NodeHealth {
     lastUpdated: new Date().toISOString(),
     agentCount,
   };
+}
+
+export function saveHealthSnapshot(health: NodeHealth): void {
+  db.insert(schema.healthSnapshots).values({
+    id: randomUUID(),
+    nodeId: health.id,
+    cpuPercent: health.cpuPercent,
+    memoryPercent: health.memoryPercent,
+    diskPercent: health.diskPercent,
+    timestamp: new Date().toISOString(),
+  }).run();
+}
+
+export function getHealthHistory(nodeId: string, hours: number = 24): { timestamp: string; cpuPercent: number; memoryPercent: number; diskPercent: number }[] {
+  const since = new Date(Date.now() - hours * 60 * 60 * 1000).toISOString();
+  const rows = sqlite.prepare(
+    'SELECT timestamp, cpu_percent, memory_percent, disk_percent FROM health_snapshots WHERE node_id = ? AND timestamp >= ? ORDER BY timestamp ASC'
+  ).all(nodeId, since);
+  return (rows as any[]).map(r => ({
+    timestamp: r.timestamp,
+    cpuPercent: r.cpu_percent,
+    memoryPercent: r.memory_percent,
+    diskPercent: r.disk_percent,
+  }));
+}
+
+// Prune old snapshots (keep last 7 days)
+export function pruneHealthSnapshots(): void {
+  const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  sqlite.prepare('DELETE FROM health_snapshots WHERE timestamp < ?').run(cutoff);
 }

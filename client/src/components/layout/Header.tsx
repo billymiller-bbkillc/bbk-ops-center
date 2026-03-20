@@ -11,6 +11,8 @@ const panelNames: Record<Panel, { title: string; breadcrumb: string }> = {
   health: { title: 'System Health', breadcrumb: 'Operations' },
   crm: { title: 'CRM', breadcrumb: 'Integrations' },
   n8n: { title: 'N8N', breadcrumb: 'Integrations' },
+  activity: { title: 'Activity Log', breadcrumb: 'Operations' },
+  settings: { title: 'Settings', breadcrumb: 'Admin' },
 };
 
 interface HeaderProps {

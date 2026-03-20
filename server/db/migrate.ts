@@ -77,5 +77,35 @@ export function runMigrations() {
       last_updated TEXT NOT NULL,
       agent_count INTEGER NOT NULL DEFAULT 0
     );
+
+    CREATE TABLE IF NOT EXISTS activity_log (
+      id TEXT PRIMARY KEY,
+      type TEXT NOT NULL,
+      source TEXT NOT NULL,
+      title TEXT NOT NULL,
+      detail TEXT,
+      severity TEXT NOT NULL DEFAULT 'info',
+      business_unit TEXT,
+      timestamp TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS health_snapshots (
+      id TEXT PRIMARY KEY,
+      node_id TEXT NOT NULL,
+      cpu_percent REAL NOT NULL,
+      memory_percent REAL NOT NULL,
+      disk_percent REAL NOT NULL,
+      timestamp TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS users (
+      id TEXT PRIMARY KEY,
+      username TEXT NOT NULL UNIQUE,
+      password_hash TEXT NOT NULL,
+      display_name TEXT NOT NULL,
+      role TEXT NOT NULL DEFAULT 'viewer',
+      created_at TEXT NOT NULL,
+      last_login_at TEXT
+    );
   `);
 }

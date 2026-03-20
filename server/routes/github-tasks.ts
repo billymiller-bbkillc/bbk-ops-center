@@ -10,6 +10,8 @@ import {
 } from '../lib/github';
 import { broadcast } from './sse';
 import { notifyAgentTask } from '../lib/openclaw';
+import { logActivity } from '../lib/activity';
+import { requireAuth } from '../middleware/auth';
 import type { GitHubTaskStatus, TaskColumn, TaskPriority } from '../../shared/types';
 
 const router = Router();
@@ -75,6 +77,11 @@ router.post('/', async (req, res) => {
     const task = await createIssue(repo, title, description || '', assignees, labels);
     res.json({ success: true, data: task });
 
+    // Log activity
+    try {
+      logActivity({ type: 'task_create', source: req.body.assignee || 'admin', title: `Created: ${task.title}`, detail: `Repo: ${task.repo}, Priority: ${task.priority}`, severity: 'info', businessUnit: task.repo });
+    } catch { /* non-blocking */ }
+
     // Push update to all SSE clients
     broadcastTasks();
 
@@ -127,8 +134,39 @@ router.patch('/:repo/:issueNumber/move', async (req, res) => {
       return res.status(400).json({ success: false, error: 'column is required' });
     }
 
+    // Aegis Quality Gate: Review → Done requires admin approval
+    if (column === 'done') {
+      // Check if task is currently in review
+      const currentTask = (await getIssues()).find(t => `${t.repo}/${t.issueNumber}` === `${repo}/${issueNumber}`);
+      if (currentTask?.column === 'review') {
+        // Must be admin or have explicit approval flag
+        const approvedBy = req.body.approvedBy;
+        if (!approvedBy && (!req.user || req.user.role === 'viewer')) {
+          return res.status(403).json({
+            success: false,
+            error: 'Aegis: Moving from Review to Done requires admin/operator approval',
+            aegisBlocked: true,
+          });
+        }
+        // Log the approval
+        logActivity({
+          type: 'approval',
+          source: approvedBy || req.user?.username || 'admin',
+          title: `Approved: ${currentTask.title}`,
+          detail: `Review → Done (${repo})`,
+          severity: 'info',
+          businessUnit: repo,
+        });
+      }
+    }
+
     const task = await moveIssueToColumn(repo, parseInt(issueNumber), column as TaskColumn);
     res.json({ success: true, data: task });
+
+    // Log activity
+    try {
+      logActivity({ type: 'task_move', source: 'admin', title: `Moved: ${task.title}`, detail: `→ ${column} (${task.repo})`, severity: 'info', businessUnit: task.repo });
+    } catch { /* non-blocking */ }
 
     // Push update to all SSE clients
     broadcastTasks();
@@ -147,6 +185,11 @@ router.delete('/:repo/:issueNumber', async (req, res) => {
     const { repo, issueNumber } = req.params;
     const task = await closeIssue(repo, parseInt(issueNumber));
     res.json({ success: true, data: task });
+
+    // Log activity
+    try {
+      logActivity({ type: 'task_delete', source: 'admin', title: `Closed: ${task.title}`, detail: `Repo: ${task.repo}`, severity: 'info', businessUnit: task.repo });
+    } catch { /* non-blocking */ }
 
     // Push update to all SSE clients
     broadcastTasks();

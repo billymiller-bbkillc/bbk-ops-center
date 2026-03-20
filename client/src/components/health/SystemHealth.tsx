@@ -6,9 +6,9 @@ import { ChartCard } from '@/components/ui/chart-card';
 import { useApi } from '@/hooks/useApi';
 import { useSSE } from '@/hooks/useSSE';
 import { formatUptime, formatBytes } from '@/lib/utils';
-import type { NodeHealth } from '@shared/types';
+import type { NodeHealth, HealthSnapshot } from '@shared/types';
 import { Server, Cpu, MemoryStick, HardDrive, Clock, Bot } from 'lucide-react';
-import { RadialBarChart, RadialBar, ResponsiveContainer } from 'recharts';
+import { RadialBarChart, RadialBar, ResponsiveContainer, LineChart, Line, CartesianGrid, XAxis, YAxis, Tooltip } from 'recharts';
 
 function getGaugeColor(pct: number): string {
   if (pct > 80) return '#ef4444';
@@ -58,6 +58,7 @@ function GaugeChart({ value, label, detail }: { value: number; label: string; de
 
 export function SystemHealth() {
   const { data: nodes, setData: setNodes } = useApi<NodeHealth[]>('/api/health');
+  const { data: healthHistory } = useApi<HealthSnapshot[]>('/api/health/history?nodeId=vps-main&hours=24');
 
   // Live SSE updates
   useSSE({
@@ -84,6 +85,43 @@ export function SystemHealth() {
           size="md"
         />
       </div>
+
+      {/* 24h History Chart */}
+      {healthHistory && healthHistory.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm font-medium">24h Resource History</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={healthHistory}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(224, 30%, 14%)" />
+                  <XAxis
+                    dataKey="timestamp"
+                    tickFormatter={(t) => new Date(t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    stroke="#71717a"
+                    fontSize={10}
+                  />
+                  <YAxis domain={[0, 100]} stroke="#71717a" fontSize={10} tickFormatter={(v) => `${v}%`} />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: 'hsl(224, 47%, 7%)',
+                      border: '1px solid hsl(224, 30%, 14%)',
+                      borderRadius: '10px',
+                      fontSize: '11px',
+                    }}
+                    labelFormatter={(t) => new Date(t).toLocaleString()}
+                  />
+                  <Line type="monotone" dataKey="cpuPercent" stroke="#3b82f6" name="CPU" strokeWidth={2} dot={false} />
+                  <Line type="monotone" dataKey="memoryPercent" stroke="#22c55e" name="Memory" strokeWidth={2} dot={false} />
+                  <Line type="monotone" dataKey="diskPercent" stroke="#eab308" name="Disk" strokeWidth={2} dot={false} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Node cards with gauges */}
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">

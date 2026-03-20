@@ -99,6 +99,9 @@ function TaskCard({
   onDelete: (id: string) => void;
   onEdit: (task: GitHubTask) => void;
 }) {
+  const isStale = task.column === 'in_progress' &&
+    (Date.now() - new Date(task.updatedAt).getTime()) > 7 * 24 * 60 * 60 * 1000;
+
   return (
     <div
       draggable
@@ -106,7 +109,8 @@ function TaskCard({
       className={cn(
         'group bg-zinc-900/60 border border-zinc-700/50 rounded-xl p-3 cursor-grab active:cursor-grabbing',
         'hover:border-zinc-600 transition-all duration-200 border-l-[3px]',
-        PRIORITY_BORDER[task.priority]
+        PRIORITY_BORDER[task.priority],
+        task.priority === 'critical' && 'ring-1 ring-red-500/30'
       )}
     >
       <div className="flex items-start justify-between gap-2">
@@ -117,6 +121,9 @@ function TaskCard({
           className="text-sm font-medium leading-tight hover:text-blue-400 transition-colors flex items-center gap-1"
           onClick={(e) => e.stopPropagation()}
         >
+          {task.priority === 'critical' && (
+            <span className="inline-block w-2 h-2 rounded-full bg-red-500 animate-pulse shrink-0 mr-0.5" />
+          )}
           {task.title}
           <ExternalLink className="w-3 h-3 opacity-0 group-hover:opacity-60 shrink-0" />
         </a>
@@ -170,6 +177,11 @@ function TaskCard({
             )}
           >
             {SUB_STATUS_BADGE[task.subStatus]!.label}
+          </span>
+        )}
+        {isStale && (
+          <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-amber-500/15 text-amber-400 border border-amber-500/30 font-medium">
+            Stale
           </span>
         )}
       </div>
@@ -511,18 +523,29 @@ export function KanbanBoard() {
       e.preventDefault();
       if (!draggedTask) return;
 
+      const [repo, issueNumber] = draggedTask.split('/');
+      
       // Optimistic update
       setGhTasks(
         (prev) => prev?.map((t) => (t.id === draggedTask ? { ...t, column } : t)) || null
       );
-      const [repo, issueNumber] = draggedTask.split('/');
-      await fetch(`/api/github-tasks/${repo}/${issueNumber}/move`, {
+      
+      const token = localStorage.getItem('ops_token');
+      const moveRes = await fetch(`/api/github-tasks/${repo}/${issueNumber}/move`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...(token ? { 'Authorization': `Bearer ${token}` } : {}) },
         body: JSON.stringify({ column }),
       });
-      // Refetch after a short delay to get accurate state
-      setTimeout(refetch, 1000);
+      const moveJson = await moveRes.json();
+      
+      // Aegis Quality Gate — if blocked, revert and show message
+      if (moveJson.aegisBlocked) {
+        alert('⚔️ Aegis Quality Gate\n\nMoving from Review → Done requires Admin or Operator approval.');
+        refetch(); // revert optimistic update
+      } else {
+        // Refetch after a short delay to get accurate state
+        setTimeout(refetch, 1000);
+      }
 
       setDraggedTask(null);
       setDragOverColumn(null);

@@ -183,6 +183,55 @@ export interface N8nSummary {
   lastChecked: string;
 }
 
+// ===== Activity Log Types =====
+export type ActivityType = 'task_move' | 'task_create' | 'task_delete' | 'agent_status' | 'agent_kill' | 'build' | 'error' | 'approval' | 'system';
+export type Severity = 'info' | 'warning' | 'error' | 'critical';
+
+export interface ActivityEntry {
+  id: string;
+  type: ActivityType;
+  source: string;
+  title: string;
+  detail?: string;
+  severity: Severity;
+  businessUnit?: string;
+  timestamp: string;
+}
+
+// ===== Health History Types =====
+export interface HealthSnapshot {
+  timestamp: string;
+  cpuPercent: number;
+  memoryPercent: number;
+  diskPercent: number;
+}
+
+// ===== Cost Projection Types =====
+export interface CostProjection {
+  dailyAverage: number;
+  daysUntilLaunch: number;
+  projectedByLaunch: number;
+  projectedMonthly: number;
+  basedOnDays: number;
+  recentTotalCost: number;
+}
+
+// ===== CRM Funnel Types =====
+export interface CrmFunnelData {
+  totalSignups: number;
+  activatedTenants: number;
+  activeRecent: number;
+  lastChecked: string;
+}
+
+export interface InactiveTenant {
+  id: string;
+  name: string;
+  lastActivity: string | null;
+  daysSinceLogin: number | null;
+  userCount: number;
+}
+
 // ===== SSE Types =====
 export type SSEEventType =
   | 'agent-update'
@@ -192,6 +241,7 @@ export type SSEEventType =
   | 'crm-update'
   | 'n8n-update'
   | 'github-task-update'
+  | 'activity-update'
   | 'heartbeat';
 
 export interface SSEEvent {
@@ -228,3 +278,71 @@ export interface ApiResponse<T> {
 }
 
 export type CostPeriod = 'day' | 'week' | 'month';
+
+// ===== Auth Types =====
+export type UserRole = 'admin' | 'operator' | 'viewer';
+
+export interface AuthUser {
+  id: string;
+  username: string;
+  displayName: string;
+  role: UserRole;
+}
+
+export interface UserManagement extends AuthUser {
+  createdAt?: string;
+  lastLoginAt?: string | null;
+}
+
+// ===== Cron Job Types =====
+export interface CronJob {
+  id: string;
+  agentId?: string;
+  name: string;
+  description?: string;
+  enabled: boolean;
+  schedule: {
+    kind: 'cron' | 'at' | 'every';
+    expr?: string;
+    at?: string;
+    every?: number;
+    tz?: string;
+  };
+  sessionTarget: 'main' | 'isolated';
+  wakeMode?: string;
+  payload: {
+    kind: 'agentTurn' | 'systemEvent';
+    message?: string;
+    model?: string;
+  };
+  delivery?: {
+    mode: 'announce' | 'webhook' | 'none';
+    channel?: string;
+    to?: string;
+  };
+  state?: {
+    nextRunAtMs?: number;
+    lastRunAtMs?: number;
+    lastRunStatus?: string;
+    lastDurationMs?: number;
+    consecutiveErrors?: number;
+  };
+  createdAtMs?: number;
+  updatedAtMs?: number;
+}
+
+// ===== Skills Types =====
+export interface Skill {
+  name: string;
+  description: string;
+  location: string;
+  version?: string;
+  source?: string;
+}
+
+// ===== Env Var Types =====
+export interface EnvVar {
+  key: string;
+  value: string;
+  masked: string;
+}

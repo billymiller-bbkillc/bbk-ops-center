@@ -18,6 +18,17 @@ export function broadcast(event: string, data: unknown) {
 }
 
 router.get('/stream', (req: Request, res: Response) => {
+  // SSE supports auth via query param since EventSource can't send headers
+  const token = req.query.token as string;
+  if (token) {
+    const { verifyToken } = require('../lib/auth');
+    const payload = verifyToken(token);
+    if (!payload) {
+      return res.status(401).json({ success: false, error: 'Invalid SSE token' });
+    }
+  }
+  // If no token, allow unauthenticated SSE for now (will be locked down later)
+
   res.writeHead(200, {
     'Content-Type': 'text/event-stream',
     'Cache-Control': 'no-cache',
@@ -67,6 +78,13 @@ export async function pollAndBroadcast() {
     } catch {
       // GitHub API may be rate-limited; don't break SSE loop
     }
+
+    // Broadcast recent activity
+    try {
+      const { getRecentActivity } = require('../lib/activity');
+      const recent = getRecentActivity(10);
+      broadcast('activity-update', recent);
+    } catch { /* ignore */ }
 
     broadcast('heartbeat', { timestamp: new Date().toISOString() });
   } catch (err) {

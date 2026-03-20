@@ -7,7 +7,8 @@ import { Progress } from '@/components/ui/progress';
 import { useApi } from '@/hooks/useApi';
 import { useSSE } from '@/hooks/useSSE';
 import { formatCost, formatTokens } from '@/lib/utils';
-import type { CostSummary, BudgetAlert, CostPeriod } from '@shared/types';
+import type { CostSummary, BudgetAlert, CostPeriod, CostProjection } from '@shared/types';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   BarChart, Bar, PieChart, Pie, Cell,
@@ -28,6 +29,7 @@ export function CostCenter() {
   const [period, setPeriod] = useState<CostPeriod>('month');
   const { data: summary, setData: setSummary } = useApi<CostSummary>(`/api/costs/summary?period=${period}`, [period]);
   const { data: alerts } = useApi<BudgetAlert[]>('/api/costs/alerts');
+  const { data: projection } = useApi<CostProjection>('/api/costs/projection');
 
   // Live SSE updates for cost data
   useSSE({
@@ -85,6 +87,34 @@ export function CostCenter() {
           accentColor="blue"
         />
       </div>
+
+      {/* Projection card */}
+      {projection && (
+        <Card className="border-purple-500/30 bg-purple-500/5">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-purple-400">🚀 Launch Cost Projection</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-3 gap-6">
+              <div>
+                <p className="text-xs text-muted-foreground">Projected by Launch</p>
+                <p className="text-2xl font-bold font-mono-nums text-purple-300">{formatCost(projection.projectedByLaunch)}</p>
+                <p className="text-[10px] text-muted-foreground">{projection.daysUntilLaunch} days remaining</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Daily Average</p>
+                <p className="text-2xl font-bold font-mono-nums text-purple-300">{formatCost(projection.dailyAverage)}</p>
+                <p className="text-[10px] text-muted-foreground">Based on last {projection.basedOnDays} days</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Projected Monthly</p>
+                <p className="text-2xl font-bold font-mono-nums text-purple-300">{formatCost(projection.projectedMonthly)}</p>
+                <p className="text-[10px] text-muted-foreground">Annualized run rate</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Main cost trend chart */}
       <ChartCard title="Daily Cost Trend" subtitle={`Spending over the selected period`}>

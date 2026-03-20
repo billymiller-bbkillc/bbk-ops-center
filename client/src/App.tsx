@@ -1,4 +1,6 @@
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useCallback } from 'react';
+import { AuthProvider, useAuth } from '@/contexts/AuthContext';
+import { LoginScreen } from '@/components/auth/LoginScreen';
 import { Sidebar, type Panel } from '@/components/layout/Sidebar';
 import { Header } from '@/components/layout/Header';
 import { Overview } from '@/components/dashboard/Overview';
@@ -8,20 +10,23 @@ import { KanbanBoard } from '@/components/kanban/KanbanBoard';
 import { SystemHealth } from '@/components/health/SystemHealth';
 import { CrmPanel } from '@/components/crm/CrmPanel';
 import { N8nPanel } from '@/components/n8n/N8nPanel';
+import { ActivityLog } from '@/components/activity/ActivityLog';
+import { SettingsPanel } from '@/components/settings/SettingsPanel';
 import { useSSE } from '@/hooks/useSSE';
+import { Loader2 } from 'lucide-react';
 
-function App() {
+function Dashboard() {
   const [activePanel, setActivePanel] = useState<Panel>('dashboard');
   const [sseConnected, setSseConnected] = useState(true);
 
-  // SSE handlers for live updates
   useSSE({
-    'agent-update': (data) => {},
-    'health-update': (data) => {},
-    'cost-update': (data) => {},
-    'crm-update': (data) => {},
-    'n8n-update': (data) => {},
-    'task-update': (data) => {},
+    'agent-update': () => {},
+    'health-update': () => {},
+    'cost-update': () => {},
+    'crm-update': () => {},
+    'n8n-update': () => {},
+    'task-update': () => {},
+    'activity-update': () => {},
   });
 
   const renderPanel = useCallback(() => {
@@ -33,6 +38,8 @@ function App() {
       case 'health': return <SystemHealth />;
       case 'crm': return <CrmPanel />;
       case 'n8n': return <N8nPanel />;
+      case 'activity': return <ActivityLog />;
+      case 'settings': return <SettingsPanel />;
     }
   }, [activePanel]);
 
@@ -48,6 +55,32 @@ function App() {
         </main>
       </div>
     </div>
+  );
+}
+
+function AppContent() {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <LoginScreen />;
+  }
+
+  return <Dashboard />;
+}
+
+function App() {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
   );
 }
 

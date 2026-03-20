@@ -296,6 +296,91 @@ export async function getLoginStats(): Promise<CrmLoginStats> {
   }
 }
 
+export interface CrmFunnelData {
+  totalSignups: number;
+  activatedTenants: number; // logged in at least once
+  activeRecent: number; // active in last 7 days
+  // paid conversion would need Stripe data, so placeholder for now
+  lastChecked: string;
+}
+
+export async function getFunnelData(): Promise<CrmFunnelData> {
+  const cached = getCached<CrmFunnelData>('funnelData');
+  if (cached) return cached;
+
+  try {
+    const result = await pool.query(`
+      SELECT
+        (SELECT COUNT(*) FROM organizations)::int AS total_signups,
+        (SELECT COUNT(DISTINCT o.id) FROM organizations o
+         INNER JOIN users u ON u.organization_id = o.id
+         WHERE u.login_count > 0
+        )::int AS activated_tenants,
+        (SELECT COUNT(DISTINCT o.id) FROM organizations o
+         INNER JOIN users u ON u.organization_id = o.id
+         WHERE u.last_login_at >= NOW() - INTERVAL '7 days'
+        )::int AS active_recent
+    `);
+
+    const row = result.rows[0];
+    const data: CrmFunnelData = {
+      totalSignups: row.total_signups,
+      activatedTenants: row.activated_tenants,
+      activeRecent: row.active_recent,
+      lastChecked: new Date().toISOString(),
+    };
+
+    setCache('funnelData', data);
+    return data;
+  } catch (err) {
+    console.error('CRM DB getFunnelData failed:', err);
+    throw err;
+  }
+}
+
+export interface InactiveTenant {
+  id: string;
+  name: string;
+  lastActivity: string | null;
+  daysSinceLogin: number | null;
+  userCount: number;
+}
+
+export async function getInactiveTenants(inactiveDays: number = 14): Promise<InactiveTenant[]> {
+  const cached = getCached<InactiveTenant[]>(`inactiveTenants_${inactiveDays}`);
+  if (cached) return cached;
+
+  try {
+    const result = await pool.query(`
+      SELECT
+        o.id,
+        o.name,
+        MAX(u.last_login_at) AS last_activity,
+        EXTRACT(DAY FROM NOW() - MAX(u.last_login_at))::int AS days_since_login,
+        COUNT(u.id)::int AS user_count
+      FROM organizations o
+      LEFT JOIN users u ON u.organization_id = o.id
+      GROUP BY o.id, o.name
+      HAVING MAX(u.last_login_at) IS NULL OR MAX(u.last_login_at) < NOW() - INTERVAL '${inactiveDays} days'
+      ORDER BY last_activity ASC NULLS FIRST
+    `);
+
+    const tenants: InactiveTenant[] = result.rows.map(row => ({
+      id: row.id,
+      name: row.name,
+      lastActivity: row.last_activity?.toISOString?.() || null,
+      daysSinceLogin: row.days_since_login,
+      userCount: row.user_count,
+    }));
+
+    setCache(`inactiveTenants_${inactiveDays}`, tenants);
+    return tenants;
+  } catch (err) {
+    console.error('CRM DB getInactiveTenants failed:', err);
+    throw err;
+  }
+}
+
 // Test connection on import
 pool.query('SELECT 1').then(() => {
   console.log('✅ CRM Database connected (Neon Postgres)');

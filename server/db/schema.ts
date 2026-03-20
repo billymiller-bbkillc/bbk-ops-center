@@ -75,3 +75,33 @@ export const nodeHealth = sqliteTable('node_health', {
   lastUpdated: text('last_updated').notNull(),
   agentCount: integer('agent_count').notNull().default(0),
 });
+
+export const activityLog = sqliteTable('activity_log', {
+  id: text('id').primaryKey(),
+  type: text('type').notNull(), // 'task_move' | 'task_create' | 'agent_status' | 'agent_kill' | 'build' | 'error' | 'approval' | 'system'
+  source: text('source').notNull(), // agent name or 'system'
+  title: text('title').notNull(),
+  detail: text('detail'),
+  severity: text('severity', { enum: ['info', 'warning', 'error', 'critical'] }).notNull().default('info'),
+  businessUnit: text('business_unit'),
+  timestamp: text('timestamp').notNull(),
+});
+
+export const healthSnapshots = sqliteTable('health_snapshots', {
+  id: text('id').primaryKey(),
+  nodeId: text('node_id').notNull(),
+  cpuPercent: real('cpu_percent').notNull(),
+  memoryPercent: real('memory_percent').notNull(),
+  diskPercent: real('disk_percent').notNull(),
+  timestamp: text('timestamp').notNull(),
+});
+
+export const users = sqliteTable('users', {
+  id: text('id').primaryKey(),
+  username: text('username').notNull().unique(),
+  passwordHash: text('password_hash').notNull(),
+  displayName: text('display_name').notNull(),
+  role: text('role', { enum: ['admin', 'operator', 'viewer'] }).notNull().default('viewer'),
+  createdAt: text('created_at').notNull(),
+  lastLoginAt: text('last_login_at'),
+});

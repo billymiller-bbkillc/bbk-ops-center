@@ -2,13 +2,17 @@ import React, { useState, useMemo } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { StatCard } from '@/components/ui/stat-card';
 import { ChartCard } from '@/components/ui/chart-card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { useApi } from '@/hooks/useApi';
 import { useSSE } from '@/hooks/useSSE';
+import { cn } from '@/lib/utils';
 import type {
   CrmQuickStats,
   CrmTenant,
   CrmUser,
   CrmLoginEvent,
+  CrmFunnelData,
+  InactiveTenant,
 } from '@shared/types';
 import {
   Building2,
@@ -23,6 +27,22 @@ import {
   AlertTriangle,
   X,
 } from 'lucide-react';
+
+// ===== FunnelStep Component =====
+function FunnelStep({ label, value, max, color }: { label: string; value: number; max: number; color: string }) {
+  const pct = max > 0 ? (value / max) * 100 : 0;
+  return (
+    <div>
+      <div className="flex justify-between text-xs mb-1">
+        <span className="text-muted-foreground">{label}</span>
+        <span className="font-medium">{value} <span className="text-muted-foreground">({pct.toFixed(0)}%)</span></span>
+      </div>
+      <div className="h-2 bg-accent rounded-full overflow-hidden">
+        <div className={cn('h-full rounded-full transition-all', color)} style={{ width: `${pct}%` }} />
+      </div>
+    </div>
+  );
+}
 
 // ===== Helpers =====
 
@@ -160,6 +180,8 @@ export function CrmPanel() {
   const { data: tenants } = useApi<CrmTenant[]>('/api/crm/tenants');
   const { data: allUsers } = useApi<CrmUser[]>('/api/crm/users');
   const { data: loginEvents } = useApi<CrmLoginEvent[]>('/api/crm/logins');
+  const { data: funnel } = useApi<CrmFunnelData>('/api/crm/funnel');
+  const { data: inactiveTenants } = useApi<InactiveTenant[]>('/api/crm/inactive');
 
   // Live SSE updates for CRM quick stats
   useSSE({
@@ -217,6 +239,63 @@ export function CrmPanel() {
           subtitle="Logged in last 30 days"
           accentColor="amber"
         />
+      </div>
+
+      {/* Conversion Funnel */}
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <ChevronDown className="w-4 h-4" /> Conversion Funnel
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {funnel ? (
+              <>
+                <FunnelStep label="Total Signups" value={funnel.totalSignups} max={funnel.totalSignups} color="bg-blue-500" />
+                <FunnelStep label="Activated (logged in)" value={funnel.activatedTenants} max={funnel.totalSignups} color="bg-amber-500" />
+                <FunnelStep label="Active (7d)" value={funnel.activeRecent} max={funnel.totalSignups} color="bg-emerald-500" />
+              </>
+            ) : (
+              <p className="text-xs text-muted-foreground">Loading funnel data...</p>
+            )}
+          </CardContent>
+        </Card>
+
+        {inactiveTenants && inactiveTenants.length > 0 ? (
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-amber-400" /> Inactive Tenants ({inactiveTenants.length})
+              </CardTitle>
+              <CardDescription>No login activity for 14+ days</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                {inactiveTenants.slice(0, 10).map(t => (
+                  <div key={t.id} className="flex items-center justify-between text-xs">
+                    <span className="font-medium">{t.name}</span>
+                    <span className="text-muted-foreground">
+                      {t.daysSinceLogin ? `${t.daysSinceLogin}d ago` : 'Never logged in'}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        ) : (
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-muted-foreground" /> Inactive Tenants
+              </CardTitle>
+              <CardDescription>No login activity for 14+ days</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p className="text-xs text-muted-foreground">No inactive tenants found</p>
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       {/* Row 2 — Tenant Directory */}

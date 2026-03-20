@@ -95,4 +95,56 @@ router.get('/alerts', (_req, res) => {
   res.json({ success: true, data: alerts });
 });
 
+router.get('/projection', (req, res) => {
+  try {
+    const allUsage = getAllAgentUsage();
+
+    // Calculate daily average over last 7 days
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    const cutoff = sevenDaysAgo.toISOString();
+
+    let recentCost = 0;
+    let recentDays = new Set<string>();
+
+    for (const agentData of allUsage) {
+      for (const u of agentData.usages) {
+        if (u.timestamp && u.timestamp >= cutoff) {
+          recentCost += u.cost;
+          if (u.timestamp) {
+            recentDays.add(u.timestamp.split('T')[0]);
+          }
+        }
+      }
+    }
+
+    const activeDays = Math.max(recentDays.size, 1);
+    const dailyAvg = recentCost / activeDays;
+
+    // Days until April 30, 2026 (launch)
+    const launchDate = new Date('2026-04-30');
+    const now = new Date();
+    const daysUntilLaunch = Math.max(0, Math.ceil((launchDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
+
+    // Projected spend
+    const projectedByLaunch = dailyAvg * daysUntilLaunch;
+    const projectedMonthly = dailyAvg * 30;
+
+    res.json({
+      success: true,
+      data: {
+        dailyAverage: Math.round(dailyAvg * 100) / 100,
+        daysUntilLaunch,
+        projectedByLaunch: Math.round(projectedByLaunch * 100) / 100,
+        projectedMonthly: Math.round(projectedMonthly * 100) / 100,
+        basedOnDays: activeDays,
+        recentTotalCost: Math.round(recentCost * 100) / 100,
+      },
+    });
+  } catch (err) {
+    console.error('Error computing projections:', err);
+    res.json({ success: true, data: { dailyAverage: 0, daysUntilLaunch: 0, projectedByLaunch: 0, projectedMonthly: 0, basedOnDays: 0, recentTotalCost: 0 } });
+  }
+});
+
 export default router;
