@@ -12,6 +12,9 @@ import { CrmPanel } from '@/components/crm/CrmPanel';
 import { N8nPanel } from '@/components/n8n/N8nPanel';
 import { ActivityLog } from '@/components/activity/ActivityLog';
 import { SettingsPanel } from '@/components/settings/SettingsPanel';
+import { CalendarPanel } from '@/components/calendar/CalendarPanel';
+import { MemoryPanel } from '@/components/memory/MemoryPanel';
+import { DocumentsPanel } from '@/components/documents/DocumentsPanel';
 import { useSSE } from '@/hooks/useSSE';
 import { Loader2 } from 'lucide-react';
 
@@ -40,6 +43,9 @@ function Dashboard() {
       case 'n8n': return <N8nPanel />;
       case 'activity': return <ActivityLog />;
       case 'settings': return <SettingsPanel />;
+      case 'calendar': return <CalendarPanel />;
+      case 'memory': return <MemoryPanel />;
+      case 'documents': return <DocumentsPanel />;
     }
   }, [activePanel]);
 

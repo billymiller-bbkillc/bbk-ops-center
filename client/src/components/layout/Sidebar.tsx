@@ -17,9 +17,12 @@ import {
   ScrollText,
   Settings,
   LogOut,
+  Calendar,
+  Brain,
+  FileText,
 } from 'lucide-react';
 
-export type Panel = 'dashboard' | 'fleet' | 'costs' | 'kanban' | 'health' | 'crm' | 'n8n' | 'activity' | 'settings';
+export type Panel = 'dashboard' | 'fleet' | 'costs' | 'kanban' | 'health' | 'crm' | 'n8n' | 'activity' | 'settings' | 'calendar' | 'memory' | 'documents';
 
 interface SidebarProps {
   activePanel: Panel;
@@ -46,6 +49,14 @@ const sections: NavSection[] = [
     label: 'Tools',
     items: [
       { id: 'kanban', label: 'Kanban Board', icon: LayoutGrid },
+    ],
+  },
+  {
+    label: 'Knowledge',
+    items: [
+      { id: 'calendar' as Panel, label: 'Calendar', icon: Calendar },
+      { id: 'memory' as Panel, label: 'Memory', icon: Brain },
+      { id: 'documents' as Panel, label: 'Documents', icon: FileText },
     ],
   },
   {

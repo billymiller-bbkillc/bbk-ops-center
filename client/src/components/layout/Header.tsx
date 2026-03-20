@@ -13,6 +13,9 @@ const panelNames: Record<Panel, { title: string; breadcrumb: string }> = {
   n8n: { title: 'N8N', breadcrumb: 'Integrations' },
   activity: { title: 'Activity Log', breadcrumb: 'Operations' },
   settings: { title: 'Settings', breadcrumb: 'Admin' },
+  calendar: { title: 'Schedule Calendar', breadcrumb: 'Knowledge' },
+  memory: { title: 'Agent Memory', breadcrumb: 'Knowledge' },
+  documents: { title: 'Documents', breadcrumb: 'Knowledge' },
 };
 
 interface HeaderProps {

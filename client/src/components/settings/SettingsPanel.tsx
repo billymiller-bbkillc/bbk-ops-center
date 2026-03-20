@@ -160,6 +160,57 @@ function AddEnvVarModal({ open, onOpenChange, onCreated }: { open: boolean; onOp
   );
 }
 
+// ===== Change Password Form =====
+function ChangePasswordForm() {
+  const { user } = useAuth();
+  const [currentPw, setCurrentPw] = useState('');
+  const [newPw, setNewPw] = useState('');
+  const [confirmPw, setConfirmPw] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState(false);
+
+  const handleSubmit = async () => {
+    if (!currentPw || !newPw) { setError('All fields required'); return; }
+    if (newPw !== confirmPw) { setError('Passwords do not match'); return; }
+    if (newPw.length < 4) { setError('Password must be at least 4 characters'); return; }
+    setSubmitting(true); setError(''); setSuccess(false);
+    try {
+      const token = localStorage.getItem('ops_token');
+      // Verify current password by attempting login
+      const loginRes = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: user?.username, password: currentPw }),
+      });
+      const loginJson = await loginRes.json();
+      if (!loginJson.success) throw new Error('Current password is incorrect');
+
+      // Update password
+      const res = await fetch(`/api/auth/users/${user?.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ password: newPw }),
+      });
+      const json = await res.json();
+      if (!json.success) throw new Error(json.error || 'Failed');
+      setSuccess(true); setCurrentPw(''); setNewPw(''); setConfirmPw('');
+    } catch (err: any) { setError(err.message); }
+    finally { setSubmitting(false); }
+  };
+
+  return (
+    <div className="space-y-3 max-w-sm">
+      <div><label className="text-xs text-zinc-400 mb-1 block">Current Password</label><input type="password" value={currentPw} onChange={e=>setCurrentPw(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-zinc-500"/></div>
+      <div><label className="text-xs text-zinc-400 mb-1 block">New Password</label><input type="password" value={newPw} onChange={e=>setNewPw(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-zinc-500"/></div>
+      <div><label className="text-xs text-zinc-400 mb-1 block">Confirm New Password</label><input type="password" value={confirmPw} onChange={e=>setConfirmPw(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-zinc-500"/></div>
+      {error && <div className="flex items-center gap-2 text-red-400 text-xs bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2"><AlertCircle className="w-3.5 h-3.5 shrink-0"/>{error}</div>}
+      {success && <div className="flex items-center gap-2 text-emerald-400 text-xs bg-emerald-500/10 border border-emerald-500/20 rounded-lg px-3 py-2"><CheckCircle className="w-3.5 h-3.5 shrink-0"/>Password changed successfully</div>}
+      <Button size="sm" onClick={handleSubmit} disabled={submitting}>{submitting ? <><Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin"/>Changing...</> : 'Change Password'}</Button>
+    </div>
+  );
+}
+
 // ===== Collapsible Section =====
 function Section({ title, icon: Icon, children, defaultOpen = false }: { title: string; icon: React.ElementType; children: React.ReactNode; defaultOpen?: boolean }) {
   const [open, setOpen] = useState(defaultOpen);
@@ -448,6 +499,11 @@ export function SettingsPanel() {
       {/* Env Vars */}
       <Section title="Environment Variables" icon={Key}>
         <EnvVarsSection />
+      </Section>
+
+      {/* Change Password */}
+      <Section title="Change Password" icon={Lock}>
+        <ChangePasswordForm />
       </Section>
     </div>
   );

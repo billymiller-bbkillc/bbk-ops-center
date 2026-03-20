@@ -346,3 +346,59 @@ export interface EnvVar {
   value: string;
   masked: string;
 }
+
+// ===== Calendar Types =====
+export interface CalendarEvent {
+  id: string;
+  name: string;
+  owner: string;
+  type: 'cron' | 'heartbeat';
+  schedule: string;
+  cronExpr?: string;
+  timezone?: string;
+  enabled: boolean;
+  nextRun?: string | null;
+  lastRun?: string | null;
+  lastStatus?: string;
+  lastDurationMs?: number;
+  description?: string;
+}
+
+// ===== Memory Types =====
+export interface MemoryFile {
+  agent: string;
+  date: string;
+  filename: string;
+  content: string;
+  sizeBytes: number;
+  type: 'daily' | 'long-term' | 'other';
+}
+
+export interface MemoryAgent {
+  id: string;
+  dailyCount: number;
+  hasLongTerm: boolean;
+}
+
+// ===== Document Types =====
+export interface DocumentItem {
+  id: string;
+  title: string;
+  filename: string;
+  agent: string;
+  category: string;
+  preview: string;
+  sizeBytes: number;
+  modifiedAt: string;
+}
+
+export interface DocumentFull extends DocumentItem {
+  content: string;
+  path: string;
+}
+
+export interface DocumentMeta {
+  categories: string[];
+  agents: string[];
+  totalDocs: number;
+}

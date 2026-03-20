@@ -15,6 +15,9 @@ import cronRoutes from './routes/cron';
 import skillsRoutes from './routes/skills';
 import envvarRoutes from './routes/envvars';
 import authRoutes from './routes/auth';
+import calendarRoutes from './routes/calendar';
+import memoryRoutes from './routes/memory';
+import documentRoutes from './routes/documents';
 import { requireAuth } from './middleware/auth';
 import { seedDefaultAdmin } from './lib/auth';
 import { startCrmPolling } from './lib/salespipe';
@@ -57,6 +60,9 @@ app.use('/api/activity', activityRoutes);
 app.use('/api/cron', cronRoutes);
 app.use('/api/skills', skillsRoutes);
 app.use('/api/envvars', envvarRoutes);
+app.use('/api/calendar', calendarRoutes);
+app.use('/api/memory', memoryRoutes);
+app.use('/api/documents', documentRoutes);
 
 // Start CRM polling (every 30s)
 startCrmPolling();
