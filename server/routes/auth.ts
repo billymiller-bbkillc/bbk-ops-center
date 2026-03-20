@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { login, getAllUsers, createUser, updateUser, deleteUser, type UserRole } from '../lib/auth';
+import { login, getAllUsers, createUser, updateUser, deleteUser, getUserById, type UserRole } from '../lib/auth';
 import { requireAuth, requireRole } from '../middleware/auth';
 import { logActivity } from '../lib/activity';
 
@@ -28,9 +28,14 @@ router.post('/login', async (req, res) => {
   }
 });
 
-// GET /api/auth/me — returns current user from token
+// GET /api/auth/me — returns current user from token (with full profile)
 router.get('/me', requireAuth, (req, res) => {
-  res.json({ success: true, data: req.user });
+  const fullUser = getUserById(req.user!.userId);
+  if (fullUser) {
+    res.json({ success: true, data: { id: fullUser.id, username: fullUser.username, displayName: fullUser.displayName, role: fullUser.role } });
+  } else {
+    res.json({ success: true, data: req.user });
+  }
 });
 
 // GET /api/auth/setup-check — public, checks if any users exist
