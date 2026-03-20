@@ -260,6 +260,10 @@ function CreateTaskModal({
     setError('');
 
     try {
+      const token = localStorage.getItem('ops_token');
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
       if (isEditMode) {
         // Edit mode — PATCH existing issue
         const url = `/api/github-tasks/${editTask.repo}/${editTask.issueNumber}`;
@@ -296,7 +300,7 @@ function CreateTaskModal({
         };
         const res = await fetch(url, {
           method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
+          headers,
           body: JSON.stringify(body),
         });
         const json = await res.json();
@@ -307,7 +311,7 @@ function CreateTaskModal({
         const body = { repo, title, description, assignee: assignee || null, priority, column, subStatus: subStatus !== 'none' ? subStatus : undefined };
         const res = await fetch(url, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers,
           body: JSON.stringify(body),
         });
         const json = await res.json();
@@ -557,7 +561,11 @@ export function KanbanBoard() {
     async (id: string) => {
       setGhTasks((prev) => prev?.filter((t) => t.id !== id) || null);
       const [repo, issueNumber] = id.split('/');
-      await fetch(`/api/github-tasks/${repo}/${issueNumber}`, { method: 'DELETE' });
+      const token = localStorage.getItem('ops_token');
+      await fetch(`/api/github-tasks/${repo}/${issueNumber}`, { 
+        method: 'DELETE',
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+      });
     },
     [setGhTasks]
   );

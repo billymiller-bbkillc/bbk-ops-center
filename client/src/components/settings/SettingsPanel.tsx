@@ -278,7 +278,7 @@ function CronSection() {
               <div className="flex items-center gap-2">
                 <span className={cn('w-2 h-2 rounded-full', job.enabled ? 'bg-emerald-400' : 'bg-zinc-600')} />
                 <span className="text-sm font-medium">{job.name}</span>
-                {job.agentId && <Badge variant="outline" className="text-[10px]">{job.agentId}</Badge>}
+                <Badge variant="outline" className="text-[10px] bg-zinc-800 text-zinc-300">Agent: {job.agentId || 'default'}</Badge>
               </div>
               <div className="flex items-center gap-1">
                 <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleRun(job.id)} disabled={running === job.id} title="Run now">
