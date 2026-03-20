@@ -4,12 +4,15 @@ import path from 'path';
 
 const router = Router();
 
+// Base path — resolves to Docker internal path or VPS host path via env
+const OPENCLAW_BASE = process.env.OPENCLAW_BASE_DIR || '/data/.openclaw';
+
 // Map agent IDs to workspace directories
 function getWorkspaceDir(agentId: string): string | null {
   // basil uses workspace-main (default agent)
   const mapping: Record<string, string> = { basil: 'workspace-main' };
   const wsName = mapping[agentId] || `workspace-${agentId}`;
-  const wsPath = path.join('/data/.openclaw', wsName);
+  const wsPath = path.join(OPENCLAW_BASE, wsName);
   try {
     if (fs.statSync(wsPath).isDirectory()) return wsPath;
   } catch {}

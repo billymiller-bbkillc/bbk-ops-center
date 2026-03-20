@@ -4,6 +4,8 @@ import path from 'path';
 
 const router = Router();
 
+const OPENCLAW_BASE = process.env.OPENCLAW_BASE_DIR || '/data/.openclaw';
+
 interface Document {
   id: string;
   title: string;
@@ -101,7 +103,7 @@ router.get('/', (req, res) => {
     const docs: Document[] = [];
 
     // Scan all workspaces
-    const wsBase = '/data/.openclaw';
+    const wsBase = OPENCLAW_BASE;
     const workspaces = fs.readdirSync(wsBase).filter(d => d.startsWith('workspace-'));
 
     for (const ws of workspaces) {
@@ -142,7 +144,7 @@ router.get('/', (req, res) => {
 router.get('/meta/categories', (_req, res) => {
   try {
     const docs: Document[] = [];
-    const wsBase = '/data/.openclaw';
+    const wsBase = OPENCLAW_BASE;
     const workspaces = fs.readdirSync(wsBase).filter(d => d.startsWith('workspace-'));
     for (const ws of workspaces) {
       scanWorkspace(path.join(wsBase, ws), wsToAgent(ws), docs);
@@ -163,7 +165,7 @@ router.get('/:id', (req, res) => {
     const filePath = Buffer.from(String(req.params.id), 'base64url').toString();
 
     // Security: only allow paths under /data/.openclaw/workspace-*
-    if (!filePath.startsWith('/data/.openclaw/workspace-')) {
+    if (!filePath.startsWith(OPENCLAW_BASE + '/workspace-')) {
       return res.status(403).json({ success: false, error: 'Access denied' });
     }
 

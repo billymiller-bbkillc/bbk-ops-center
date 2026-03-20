@@ -2,7 +2,8 @@ import fs from 'fs';
 import path from 'path';
 import { execSync } from 'child_process';
 
-const CRON_JOBS_FILE = process.env.OPENCLAW_CRON_FILE || '/data/.openclaw/cron/jobs.json';
+const OPENCLAW_BASE = process.env.OPENCLAW_BASE_DIR || '/data/.openclaw';
+const CRON_JOBS_FILE = process.env.OPENCLAW_CRON_FILE || `${OPENCLAW_BASE}/cron/jobs.json`;
 const GATEWAY_URL = process.env.OPENCLAW_GATEWAY_URL || 'http://127.0.0.1:18789';
 const GATEWAY_TOKEN = process.env.OPENCLAW_GATEWAY_TOKEN || 'E1QiKQwbhRJ0kVuLRM7mjK2tLdcy7vOP';
 

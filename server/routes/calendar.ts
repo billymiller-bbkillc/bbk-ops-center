@@ -75,7 +75,7 @@ router.get('/', (_req, res) => {
 
     // 2. Agent heartbeats from openclaw.json
     try {
-      const configPath = '/data/.openclaw/openclaw.json';
+      const configPath = (process.env.OPENCLAW_BASE_DIR || '/data/.openclaw') + '/openclaw.json';
       const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
       const defaults = config.agents?.defaults || {};
       const defaultHeartbeat = defaults.heartbeat?.every || '30m';
